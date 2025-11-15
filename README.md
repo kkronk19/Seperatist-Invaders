@@ -55,3 +55,47 @@ git clone https://github.com/kkronk19/Seperatist-Invaders.git
 3. Navigate to:
 src/app/Main.java
 4. Run the main method to start the program.
+
+ Roadmap / Future Development
+I plan to continue expanding this project significantly. Upcoming features include:
+
+Gameplay Features
+
+Full playable main mode
+
+Enemy waves, bosses, scoring
+
+Multiple weapon types
+
+Player upgrades
+
+Networking & Co-op
+
+Peer-to-peer or dedicated server gameplay
+
+Co-op missions
+
+Networking using Java sockets or modern APIs (WebSockets, Netty, etc.)
+
+API Integrations
+
+Cloud-saved high scores
+
+Matchmaking or player statistics
+
+Daily challenges
+
+Integration with cyber or security-themed APIs
+(I may explore threat-intel or cybersecurity-related gameplay mechanics.)
+
+Technical Expansion
+
+Asset loading system
+
+Better sprite rendering pipeline
+
+Sound/music engine
+
+Physics improvements
+
+AI behaviors for enemies
