@@ -5,6 +5,8 @@ OVERVIEW
 Separatist Invaders is a Java-based 2D shooter that launches from a central main entry
 point. The program opens with a title screen featuring three options:
 
+<img width="1181" height="668" alt="image" src="https://github.com/user-attachments/assets/d55946d6-c7bf-43aa-a794-6cf632eda2ca" />
+
 Play — currently closes the title panel (gameplay coming soon)
 
 Sandbox Mode — a live testing environment for mechanics, entities, and new features
