@@ -11,6 +11,9 @@ Play — currently closes the title panel (gameplay coming soon)
 
 Sandbox Mode — a live testing environment for mechanics, entities, and new features
 
+<img width="1190" height="671" alt="image" src="https://github.com/user-attachments/assets/6bbdf671-fbab-48c8-9289-bdd4119f41f7" />
+
+
 Exit — closes the program
 
 The purpose of this project is to create a flexible, extensible game architecture that can grow over time with additional content, mechanics, and systems.
