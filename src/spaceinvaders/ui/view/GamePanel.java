@@ -4,10 +4,13 @@ import spaceinvaders.core.GameState;
 import spaceinvaders.core.SceneManager;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.features.StartMenuDemo;
+import spaceinvaders.input.KeyInput;
+import spaceinvaders.input.NpcController;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.locks.LockSupport;
 
 public class GamePanel extends JPanel implements Runnable {
@@ -27,6 +30,10 @@ public class GamePanel extends JPanel implements Runnable {
     private final double leftFrac = 0.05;
     private final double rightFrac = 0.90;
 
+    // Title clones (two independent controllers) + title bullets (use existing Bullet class)
+    private final List<NpcController> titleClones = new ArrayList<>();
+    private final List<Bullet> titleBullets = new ArrayList<>();
+
     // Rendering transform
     private double scale = 1.0;
     private int offX = 0;
@@ -44,43 +51,32 @@ public class GamePanel extends JPanel implements Runnable {
         state.width  = GameState.VIRTUAL_W;
         state.height = GameState.VIRTUAL_H;
 
-        setPreferredSize(new Dimension(1280, 720)); // safe default window
+        setPreferredSize(new Dimension(1280, 720));
         setBackground(Color.BLACK);
         setFocusable(true);
         setLayout(new GridBagLayout());
 
-        // Start menu uses virtual size ONLY
+        // Demo uses virtual size ONLY
         demo.init(GameState.VIRTUAL_W, GameState.VIRTUAL_H, leftFrac, rightFrac);
 
-        setupKeyBindings();
+        // Spawn TWO clones for title screen with different seeds (desync)
+        spawnTitleClones();
+
+        // Input elsewhere (SRP)
+        KeyInput.install(this, scenes);
     }
 
-    private void setupKeyBindings() {
-        InputMap im = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
-        ActionMap am = getActionMap();
+    private void spawnTitleClones() {
+        titleClones.clear();
+        titleBullets.clear();
 
-        bind(im, am, "LEFT",  KeyEvent.VK_LEFT);
-        bind(im, am, "A",     KeyEvent.VK_A);
-        bind(im, am, "RIGHT", KeyEvent.VK_RIGHT);
-        bind(im, am, "D",     KeyEvent.VK_D);
-        bind(im, am, "SPACE", KeyEvent.VK_SPACE);
-        bind(im, am, "R",     KeyEvent.VK_R);
-    }
+        // Use demo's anchor points
+        int leftX  = demo.leftX();
+        int rightX = demo.rightX();
 
-    private void bind(InputMap im, ActionMap am, String key, int vk) {
-        im.put(KeyStroke.getKeyStroke("pressed " + key), key + "-p");
-        im.put(KeyStroke.getKeyStroke("released " + key), key + "-r");
-
-        am.put(key + "-p", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent e) {
-                if (scenes.current() != null) scenes.current().handleKeyPressed(vk);
-            }
-        });
-        am.put(key + "-r", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent e) {
-                if (scenes.current() != null) scenes.current().handleKeyReleased(vk);
-            }
-        });
+        // Different seeds => different direction/firing timing
+        titleClones.add(new NpcController(leftX,  System.nanoTime()));
+        titleClones.add(new NpcController(rightX, System.nanoTime() ^ 0x9E3779B97F4A7C15L));
     }
 
     public void start() {
@@ -116,7 +112,30 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         if (state.mode == GameState.AppMode.START_MENU) {
+            // background/invader ambiance (and their fall movement)
             demo.update(FRAME_TIME, GameState.VIRTUAL_W, GameState.VIRTUAL_H);
+
+            int floorY = demo.floorY();
+            int playerW = demo.playerW();
+
+            // Two independent clones with independent fire timers + SFX
+            for (NpcController npc : titleClones) {
+                npc.tick(FRAME_TIME, GameState.VIRTUAL_W, playerW, floorY, titleBullets);
+            }
+
+            // Update title bullets + cull
+            for (int i = 0; i < titleBullets.size(); i++) {
+                titleBullets.get(i).update();
+            }
+            for (int i = titleBullets.size() - 1; i >= 0; i--) {
+                if (titleBullets.get(i).isOffScreen(GameState.VIRTUAL_W, GameState.VIRTUAL_H)) {
+                    titleBullets.remove(i);
+                }
+            }
+
+            // Collision + death SFX using StartMenuDemo's invader list
+            demo.handleTitleCollisions(titleBullets);
+
             if (lastMode != state.mode) {
                 lastMode = state.mode;
                 updateMenuVisibility();
@@ -124,10 +143,7 @@ public class GamePanel extends JPanel implements Runnable {
             return;
         }
 
-        // Fallback legacy logic
-        state.bullets.removeIf(b -> b.y < 0);
-        state.bullets.forEach(b -> b.y -= 10);
-
+        // non-title fallback
         if (state.moveLeft)  state.playerX -= 8;
         if (state.moveRight) state.playerX += 8;
 
@@ -149,8 +165,8 @@ public class GamePanel extends JPanel implements Runnable {
             ph / (double) GameState.VIRTUAL_H
         );
 
-        int viewW = (int)(GameState.VIRTUAL_W * scale);
-        int viewH = (int)(GameState.VIRTUAL_H * scale);
+        int viewW = (int) (GameState.VIRTUAL_W * scale);
+        int viewH = (int) (GameState.VIRTUAL_H * scale);
 
         offX = (pw - viewW) / 2;
         offY = (ph - viewH) / 2;
@@ -164,7 +180,7 @@ public class GamePanel extends JPanel implements Runnable {
         g2.translate(offX, offY);
         g2.scale(scale, scale);
 
-        // WORLD SIZE NEVER CHANGES
+        // world stays virtual
         state.width  = GameState.VIRTUAL_W;
         state.height = GameState.VIRTUAL_H;
 
@@ -188,6 +204,7 @@ public class GamePanel extends JPanel implements Runnable {
         g.setColor(Color.BLACK);
         g.fillRect(0, 0, GameState.VIRTUAL_W, GameState.VIRTUAL_H);
 
+        // background
         Image bg = demo.starsImage();
         if (bg != null) {
             int iw = bg.getWidth(this);
@@ -197,8 +214,8 @@ public class GamePanel extends JPanel implements Runnable {
                     GameState.VIRTUAL_W / (double) iw,
                     GameState.VIRTUAL_H / (double) ih
                 );
-                int dw = (int)(iw * s);
-                int dh = (int)(ih * s);
+                int dw = (int) (iw * s);
+                int dh = (int) (ih * s);
                 int dx = (GameState.VIRTUAL_W - dw) / 2;
                 int dy = (GameState.VIRTUAL_H - dh) / 2;
 
@@ -209,24 +226,42 @@ public class GamePanel extends JPanel implements Runnable {
             }
         }
 
+        // clones driven by controllers
         int y = demo.floorY();
+        int w = demo.playerW();
+        int h = demo.playerH();
         Image player = demo.playerImage();
 
-        if (player != null) {
-            g.drawImage(player, demo.leftX(),  y, demo.playerW(), demo.playerH(), this);
-            g.drawImage(player, demo.rightX(), y, demo.playerW(), demo.playerH(), this);
+        for (NpcController npc : titleClones) {
+            int x = npc.getX();
+            if (player != null) g.drawImage(player, x, y, w, h, this);
+            else {
+                g.setColor(Color.WHITE);
+                g.fillRect(x, y, w, h);
+            }
         }
 
+        // invaders from demo snapshots
         Image inv = demo.invaderImage();
         for (GameState.Invader i : demo.invadersSnapshot()) {
-            if (inv != null)
-                g.drawImage(inv, i.x, i.y, i.size, i.size, this);
+            if (inv != null) g.drawImage(inv, i.x, i.y, i.size, i.size, this);
+            else {
+                g.setColor(Color.GREEN);
+                g.fillRect(i.x, i.y, i.size, i.size);
+            }
         }
 
-        Image bullet = demo.bulletImage();
-        for (Bullet b : demo.bulletsSnapshot()) {
-            if (bullet != null)
-                g.drawImage(bullet, b.x - 6, b.y - 6, 12, 12, this);
+        // bullets from titleBullets (existing Bullet class)
+        Image bulletImg = demo.bulletImage();
+        for (Bullet b : titleBullets) {
+            if (bulletImg != null) {
+                g.drawImage(bulletImg, b.x - 6, b.y - 6, 12, 12, this);
+            } else {
+                g.setColor(Color.YELLOW);
+                int[] xs = { b.x, b.x - 5, b.x + 5 };
+                int[] ys = { b.y, b.y + 10, b.y + 10 };
+                g.fillPolygon(xs, ys, 3);
+            }
         }
     }
 

@@ -2,8 +2,6 @@ package spaceinvaders.app;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
@@ -18,13 +16,10 @@ public final class Bootstrap {
 
     public static void launch() {
         SwingUtilities.invokeLater(() -> {
-            // --- Base window size (max cap) ---
-            final int BASE_W = 1920;
-            final int BASE_H = 1080;
-
             GameState state = new GameState();
-            state.width  = BASE_W;
-            state.height = BASE_H;
+            // World size is fixed (virtual)
+            state.width  = GameState.VIRTUAL_W;
+            state.height = GameState.VIRTUAL_H;
 
             SceneManager scenes = new SceneManager();
 
@@ -44,20 +39,27 @@ public final class Bootstrap {
 
             frame.setContentPane(panel);
 
-            // Windowed, can shrink but never exceed BASE_W x BASE_H
-            frame.pack();
+            // Pick a window size that fits the current display
+            Rectangle bounds = GraphicsEnvironment
+                    .getLocalGraphicsEnvironment()
+                    .getMaximumWindowBounds();
+
+            int targetW = GameState.VIRTUAL_W;
+            int targetH = GameState.VIRTUAL_H;
+
+            double s = Math.min(
+                    (bounds.width  * 0.9) / targetW,
+                    (bounds.height * 0.9) / targetH
+            );
+
+            if (s < 1.0) {
+                targetW = (int) (targetW * s);
+                targetH = (int) (targetH * s);
+            }
+
+            frame.setSize(targetW, targetH);
             frame.setResizable(true);
             frame.setLocationRelativeTo(null);
-            frame.addComponentListener(new ComponentAdapter() {
-                @Override
-                public void componentResized(ComponentEvent e) {
-                    int w = Math.min(frame.getWidth(),  BASE_W);
-                    int h = Math.min(frame.getHeight(), BASE_H);
-                    if (w != frame.getWidth() || h != frame.getHeight()) {
-                        frame.setSize(w, h);
-                    }
-                }
-            });
             frame.setVisible(true);
 
             panel.start();

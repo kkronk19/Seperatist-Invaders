@@ -15,10 +15,9 @@ public class GameState {
     public static final int VIRTUAL_W = 1920;
     public static final int VIRTUAL_H = 1080;
 
-
-    // Panel dimensions (set these from your panel on resize/init)
-    public int width = 600;
-    public int height = 700;
+    // Virtual world dimensions (do not change at runtime)
+    public int width  = VIRTUAL_W;
+    public int height = VIRTUAL_H;
 
     // player
     public int playerX = 200;
