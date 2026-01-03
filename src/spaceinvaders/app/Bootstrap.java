@@ -19,8 +19,8 @@ public final class Bootstrap {
     public static void launch() {
         SwingUtilities.invokeLater(() -> {
             // --- Base window size (max cap) ---
-            final int BASE_W = 1600;
-            final int BASE_H = 900;
+            final int BASE_W = 1920;
+            final int BASE_H = 1080;
 
             GameState state = new GameState();
             state.width  = BASE_W;

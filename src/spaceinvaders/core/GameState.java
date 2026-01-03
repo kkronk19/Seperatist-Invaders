@@ -11,6 +11,11 @@ public class GameState {
     public enum AppMode { START_MENU, PLAY, SANDBOX }
     public AppMode mode = AppMode.START_MENU;
 
+    // Virtual dimensions (fixed, used for game logic and rendering scale)
+    public static final int VIRTUAL_W = 1920;
+    public static final int VIRTUAL_H = 1080;
+
+
     // Panel dimensions (set these from your panel on resize/init)
     public int width = 600;
     public int height = 700;
