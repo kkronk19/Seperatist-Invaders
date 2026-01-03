@@ -4,10 +4,12 @@ import spaceinvaders.core.GameState;
 import spaceinvaders.core.SceneManager;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.features.StartMenuDemo;
+import spaceinvaders.input.KeyInput;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.concurrent.locks.LockSupport;
 
 public class GamePanel extends JPanel implements Runnable {
@@ -52,35 +54,8 @@ public class GamePanel extends JPanel implements Runnable {
         // Start menu uses virtual size ONLY
         demo.init(GameState.VIRTUAL_W, GameState.VIRTUAL_H, leftFrac, rightFrac);
 
-        setupKeyBindings();
-    }
-
-    private void setupKeyBindings() {
-        InputMap im = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
-        ActionMap am = getActionMap();
-
-        bind(im, am, "LEFT",  KeyEvent.VK_LEFT);
-        bind(im, am, "A",     KeyEvent.VK_A);
-        bind(im, am, "RIGHT", KeyEvent.VK_RIGHT);
-        bind(im, am, "D",     KeyEvent.VK_D);
-        bind(im, am, "SPACE", KeyEvent.VK_SPACE);
-        bind(im, am, "R",     KeyEvent.VK_R);
-    }
-
-    private void bind(InputMap im, ActionMap am, String key, int vk) {
-        im.put(KeyStroke.getKeyStroke("pressed " + key), key + "-p");
-        im.put(KeyStroke.getKeyStroke("released " + key), key + "-r");
-
-        am.put(key + "-p", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent e) {
-                if (scenes.current() != null) scenes.current().handleKeyPressed(vk);
-            }
-        });
-        am.put(key + "-r", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent e) {
-                if (scenes.current() != null) scenes.current().handleKeyReleased(vk);
-            }
-        });
+        // Input handled elsewhere (SRP)
+        KeyInput.install(this, scenes);
     }
 
     public void start() {
@@ -149,15 +124,15 @@ public class GamePanel extends JPanel implements Runnable {
             ph / (double) GameState.VIRTUAL_H
         );
 
-        int viewW = (int)(GameState.VIRTUAL_W * scale);
-        int viewH = (int)(GameState.VIRTUAL_H * scale);
+        int viewW = (int) (GameState.VIRTUAL_W * scale);
+        int viewH = (int) (GameState.VIRTUAL_H * scale);
 
         offX = (pw - viewW) / 2;
         offY = (ph - viewH) / 2;
 
         Graphics2D g2 = (Graphics2D) g.create();
 
-        // Letterbox
+        // Letterbox background
         g2.setColor(Color.BLACK);
         g2.fillRect(0, 0, pw, ph);
 
@@ -197,8 +172,8 @@ public class GamePanel extends JPanel implements Runnable {
                     GameState.VIRTUAL_W / (double) iw,
                     GameState.VIRTUAL_H / (double) ih
                 );
-                int dw = (int)(iw * s);
-                int dh = (int)(ih * s);
+                int dw = (int) (iw * s);
+                int dh = (int) (ih * s);
                 int dx = (GameState.VIRTUAL_W - dw) / 2;
                 int dy = (GameState.VIRTUAL_H - dh) / 2;
 
@@ -232,8 +207,9 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void stop() {
         running = false;
-        try { if (gameThread != null) gameThread.join(); }
-        catch (InterruptedException ignored) {}
+        try {
+            if (gameThread != null) gameThread.join();
+        } catch (InterruptedException ignored) {}
     }
 
     public void attachMenuBar(JMenuBar bar) {
