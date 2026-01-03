@@ -1,7 +1,7 @@
 package spaceinvaders.core.entities;
 
 public class Bullet {
-    public enum BulletKind { BASIC, MISSILE } // <- include MISSILE
+    public enum BulletKind { BASIC, MISSILE, BLADE } // <- include New bullet kinds here
 
     public int x, y;
     public int vx, vy;

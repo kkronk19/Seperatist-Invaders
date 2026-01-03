@@ -20,6 +20,7 @@ public final class KeyInput {
         bind(im, am, "D",     KeyEvent.VK_D,    scenes);
         bind(im, am, "SPACE", KeyEvent.VK_SPACE,scenes);
         bind(im, am, "R",     KeyEvent.VK_R,    scenes);
+        bind(im, am, "F", KeyEvent.VK_F, scenes);
     }
 
     private static void bind(InputMap im, ActionMap am, String key, int vk, SceneManager scenes) {
