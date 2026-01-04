@@ -3,11 +3,11 @@ package spaceinvaders.core.render;
 import spaceinvaders.core.GameState;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.Missile;
+import spaceinvaders.core.entities.Blade;
 
-import java.awt.*;
+import java.awt.Graphics2D;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.awt.Graphics2D;
 
 /** Registry + dispatcher for bullet rendering strategies. */
 public final class BulletRenderers {
@@ -19,6 +19,9 @@ public final class BulletRenderers {
         // register defaults
         register(Bullet.class,  new DefaultBulletRenderer());
         register(Missile.class, new MissileRenderer());
+
+        // NEW: Blade rendering
+        register(Blade.class, new BladeRenderer());
     }
 
     public static void register(Class<?> bulletClass, BulletRenderer renderer) {

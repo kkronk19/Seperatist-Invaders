@@ -9,6 +9,10 @@ import spaceinvaders.weapons.BlasterWeapon;
 import spaceinvaders.weapons.MissileWeapon;
 import spaceinvaders.services.audio.AudioManager;
 
+// CHANGE THIS IMPORT to match where YOU put Blade:
+// import spaceinvaders.core.entities.Blade;
+import spaceinvaders.core.entities.Blade;
+
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Image;
@@ -53,6 +57,20 @@ public class SandboxScene implements Scene {
         return out;
     }
 
+    // --- Blade weapon config / upgrades ---
+    private int bladeCooldownMs = 0;
+
+    // "fires about same as missile"
+    private static final int BLADE_COOLDOWN = 850;
+
+    // base blade stats
+    private static final int BLADE_PIERCE  = 3;
+    private static final int BLADE_BOUNCES = 3;
+
+    // upgrades (flip these later from your upgrade system)
+    private boolean bladeVerticalBounce = false;     // top/bottom do not despawn (bounce instead)
+    private boolean bladeLegendarySplit = false;     // first side-bounce spawns 2
+
     public SandboxScene(GameState state, SceneManager scenes) {
         this.state = state;
         this.scenes = scenes;
@@ -91,6 +109,10 @@ public class SandboxScene implements Scene {
             case KeyEvent.VK_R:     // missile tap
                 if (fire != null) fire.triggerSecondaryTap();
                 break;
+
+            case KeyEvent.VK_F:     // BLADE weapon
+                tryFireBlades();
+                break;
         }
     }
 
@@ -108,9 +130,55 @@ public class SandboxScene implements Scene {
         }
     }
 
+    /** Spawns two angled blades (±20° from vertical) if off cooldown. */
+    private void tryFireBlades() {
+        if (bladeCooldownMs > 0) return;
+
+        int muzzleX = state.playerX + state.playerWidth / 2;
+        int muzzleY = state.height - state.playerHeight - 10;
+
+        // ~20 degrees from vertical
+        // speed 12 -> vx ~ 4, vy ~ -11
+        int vx = 14;
+        int vy = -4;
+
+        int size = 10;
+
+        bullets.add(new Blade(
+            muzzleX, muzzleY,
+            -vx, vy,
+            size,
+            BLADE_BOUNCES,
+            BLADE_PIERCE,
+            bladeLegendarySplit,
+            bladeVerticalBounce
+        ));
+
+        bullets.add(new Blade(
+            muzzleX, muzzleY,
+            +vx, vy,
+            size,
+            BLADE_BOUNCES,
+            BLADE_PIERCE,
+            bladeLegendarySplit,
+            bladeVerticalBounce
+        ));
+
+        bladeCooldownMs = BLADE_COOLDOWN;
+
+        // Fire SFX (guarded)
+        try {
+            AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_cis_blaster_fire.wav", 0.15f);
+        } catch (Throwable ignored) {}
+    }
+
     @Override
     public void update(double dtMillis) {
         long now = System.currentTimeMillis();
+        int dtMs = (int) Math.max(1, Math.round(dtMillis));
+
+        // --- Blade cooldown ---
+        if (bladeCooldownMs > 0) bladeCooldownMs -= dtMs;
 
         // --- Player movement ---
         if (moveLeft)  state.playerX -= 8;
@@ -140,17 +208,37 @@ public class SandboxScene implements Scene {
         }
 
         // --- Bullet movement ---
+        // CHANGED: Blades use updateBlade (for bounce/split); others use normal update
+        List<Bullet> pendingAdds = new ArrayList<>();
+
         for (Iterator<Bullet> it = bullets.iterator(); it.hasNext();) {
             Bullet b = it.next();
+
+            if (b instanceof Blade blade) {
+                // updateBlade handles bounce + (optional) split; returns children to add safely
+                List<Blade> spawned = blade.updateBlade(dtMs, state.width, state.height);
+                if (spawned != null && !spawned.isEmpty()) pendingAdds.addAll(spawned);
+
+                // remove if dead
+                if (blade.isDead()) {
+                    it.remove();
+                }
+                continue;
+            }
+
+            // normal bullets
             b.update(); // applies vx, vy (missile x is already set in weapon update)
             if (b.isOffScreen(state.width, state.height)) it.remove();
         }
+
+        // add any blade children after iteration
+        if (!pendingAdds.isEmpty()) bullets.addAll(pendingAdds);
 
         // --- Invader spawning ---
         if (now > nextSpawnMs) {
             int x = rng.nextInt(Math.max(1, state.width - 50));
             invaders.add(new GameState.Invader(x, -40, 40));
-            nextSpawnMs = now + 800 + rng.nextInt(600);
+            nextSpawnMs = now + 610 + rng.nextInt(600);
         }
 
         // --- Invader movement ---
@@ -164,28 +252,42 @@ public class SandboxScene implements Scene {
         Rectangle br = new Rectangle();
         Rectangle ir = new Rectangle();
 
-        // CHANGED: collect adds to avoid modifying bullets during iteration
-        List<Bullet> pendingAdds = new ArrayList<>();
+        // CHANGED: collect shrapnel adds to avoid modifying bullets during iteration
+        List<Bullet> pendingAdds2 = new ArrayList<>();
 
         for (Iterator<Bullet> bit = bullets.iterator(); bit.hasNext();) {
             Bullet b = bit.next();
             br.setBounds(b.x, b.y, b.size, b.size);
+
             boolean hit = false;
+            boolean removeBullet = false;
 
             for (Iterator<GameState.Invader> iit = invaders.iterator(); iit.hasNext();) {
                 GameState.Invader inv = iit.next();
                 ir.setBounds(inv.x, inv.y, inv.size, inv.size);
+
                 if (br.intersects(ir)) {
                     iit.remove();
                     hit = true;
 
-                    // if this was a missile, explode into shrapnel at impact point
+                    // missile -> shrapnel
                     if (b.kind == Bullet.BulletKind.MISSILE) {
                         int cx = b.x + b.size / 2;
                         int cy = b.y + b.size / 2;
-                        pendingAdds.addAll(spawnShrapnel(cx, cy)); // collect, don't add now
+                        pendingAdds2.addAll(spawnShrapnel(cx, cy));
+                        removeBullet = true;
+                    }
+                    // blade -> pierce (do not remove unless out of pierce)
+                    else if (b instanceof Blade blade) {
+                        boolean despawn = blade.onHitInvader();
+                        removeBullet = despawn;
+                    }
+                    // normal bullets -> despawn on hit
+                    else {
+                        removeBullet = true;
                     }
 
+                    // death sfx
                     AudioManager.get().playRandomSfx(
                         1.1f,
                         "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
@@ -195,13 +297,11 @@ public class SandboxScene implements Scene {
                     break;
                 }
             }
-            if (hit) bit.remove();
+
+            if (hit && removeBullet) bit.remove();
         }
 
-        // CHANGED: add shards only after iterating
-        if (!pendingAdds.isEmpty()) {
-            bullets.addAll(pendingAdds);
-        }
+        if (!pendingAdds2.isEmpty()) bullets.addAll(pendingAdds2);
     }
 
     @Override
@@ -210,7 +310,7 @@ public class SandboxScene implements Scene {
         g.setColor(Color.BLACK);
         g.fillRect(0, 0, width, height);
 
-        // bullets via renderers
+        // bullets via renderers (if you have BladeRenderer registered, it will show)
         for (Bullet b : bullets) {
             spaceinvaders.core.render.BulletRenderers.render(g, b, state);
         }
