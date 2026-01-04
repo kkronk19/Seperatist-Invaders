@@ -8,9 +8,6 @@ import spaceinvaders.input.FireController;
 import spaceinvaders.weapons.BlasterWeapon;
 import spaceinvaders.weapons.MissileWeapon;
 import spaceinvaders.services.audio.AudioManager;
-
-// CHANGE THIS IMPORT to match where YOU put Blade:
-// import spaceinvaders.core.entities.Blade;
 import spaceinvaders.core.entities.Blade;
 
 import java.awt.Color;
@@ -168,7 +165,7 @@ public class SandboxScene implements Scene {
 
         // Fire SFX (guarded)
         try {
-            AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_cis_blaster_fire.wav", 0.15f);
+            AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_blade_fire.wav", 0.25f);
         } catch (Throwable ignored) {}
     }
 
@@ -216,7 +213,7 @@ public class SandboxScene implements Scene {
 
             if (b instanceof Blade blade) {
                 // updateBlade handles bounce + (optional) split; returns children to add safely
-                List<Blade> spawned = blade.updateBlade(dtMs, state.width, state.height);
+                List<Bullet> spawned = blade.updateBlade(dtMs, state.width, state.height);
                 if (spawned != null && !spawned.isEmpty()) pendingAdds.addAll(spawned);
 
                 // remove if dead
