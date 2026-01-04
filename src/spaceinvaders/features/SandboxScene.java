@@ -4,6 +4,7 @@ import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.GameState;
 import spaceinvaders.core.Scene;
 import spaceinvaders.core.SceneManager;
+import spaceinvaders.core.systems.CollisionSystem;
 import spaceinvaders.input.FireController;
 import spaceinvaders.weapons.BlasterWeapon;
 import spaceinvaders.weapons.MissileWeapon;
@@ -13,7 +14,6 @@ import spaceinvaders.core.entities.Blade;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Image;
-import java.awt.Rectangle;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -134,8 +134,6 @@ public class SandboxScene implements Scene {
         int muzzleX = state.playerX + state.playerWidth / 2;
         int muzzleY = state.height - state.playerHeight - 10;
 
-        // ~20 degrees from vertical
-        // speed 12 -> vx ~ 4, vy ~ -11
         int vx = 14;
         int vy = -4;
 
@@ -205,30 +203,24 @@ public class SandboxScene implements Scene {
         }
 
         // --- Bullet movement ---
-        // CHANGED: Blades use updateBlade (for bounce/split); others use normal update
+        // Blades use updateBlade (for bounce/split); others use normal update
         List<Bullet> pendingAdds = new ArrayList<>();
 
         for (Iterator<Bullet> it = bullets.iterator(); it.hasNext();) {
             Bullet b = it.next();
 
             if (b instanceof Blade blade) {
-                // updateBlade handles bounce + (optional) split; returns children to add safely
                 List<Bullet> spawned = blade.updateBlade(dtMs, state.width, state.height);
                 if (spawned != null && !spawned.isEmpty()) pendingAdds.addAll(spawned);
 
-                // remove if dead
-                if (blade.isDead()) {
-                    it.remove();
-                }
+                if (blade.isDead()) it.remove();
                 continue;
             }
 
-            // normal bullets
-            b.update(); // applies vx, vy (missile x is already set in weapon update)
+            b.update();
             if (b.isOffScreen(state.width, state.height)) it.remove();
         }
 
-        // add any blade children after iteration
         if (!pendingAdds.isEmpty()) bullets.addAll(pendingAdds);
 
         // --- Invader spawning ---
@@ -245,60 +237,12 @@ public class SandboxScene implements Scene {
             if (inv.y > state.height + 50) it.remove();
         }
 
-        // --- Collisions ---
-        Rectangle br = new Rectangle();
-        Rectangle ir = new Rectangle();
-
-        // CHANGED: collect shrapnel adds to avoid modifying bullets during iteration
-        List<Bullet> pendingAdds2 = new ArrayList<>();
-
-        for (Iterator<Bullet> bit = bullets.iterator(); bit.hasNext();) {
-            Bullet b = bit.next();
-            br.setBounds(b.x, b.y, b.size, b.size);
-
-            boolean hit = false;
-            boolean removeBullet = false;
-
-            for (Iterator<GameState.Invader> iit = invaders.iterator(); iit.hasNext();) {
-                GameState.Invader inv = iit.next();
-                ir.setBounds(inv.x, inv.y, inv.size, inv.size);
-
-                if (br.intersects(ir)) {
-                    iit.remove();
-                    hit = true;
-
-                    // missile -> shrapnel
-                    if (b.kind == Bullet.BulletKind.MISSILE) {
-                        int cx = b.x + b.size / 2;
-                        int cy = b.y + b.size / 2;
-                        pendingAdds2.addAll(spawnShrapnel(cx, cy));
-                        removeBullet = true;
-                    }
-                    // blade -> pierce (do not remove unless out of pierce)
-                    else if (b instanceof Blade blade) {
-                        boolean despawn = blade.onHitInvader();
-                        removeBullet = despawn;
-                    }
-                    // normal bullets -> despawn on hit
-                    else {
-                        removeBullet = true;
-                    }
-
-                    // death sfx
-                    AudioManager.get().playRandomSfx(
-                        1.1f,
-                        "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
-                        "/spaceinvaders/resources/audio/sfx/CICOM408.wav",
-                        "/spaceinvaders/resources/audio/sfx/CICOM409.wav"
-                    );
-                    break;
-                }
-            }
-
-            if (hit && removeBullet) bit.remove();
-        }
-
-        if (!pendingAdds2.isEmpty()) bullets.addAll(pendingAdds2);
+        // --- Collisions (MOVED OUT) ---
+        CollisionSystem.bulletsVsInvaders(
+            bullets,
+            invaders,
+            this::spawnShrapnel
+        );
     }
 
     @Override
@@ -320,40 +264,6 @@ public class SandboxScene implements Scene {
             } else {
                 g.setColor(Color.GREEN);
                 g.fillRect(inv.x, inv.y, inv.size, inv.size);
-            }
-        }
-
-        // legacy bullet shapes/image (kept intact)
-        for (Bullet b : bullets) {
-            if (state.bulletType == GameState.BulletType.IMAGE && state.bulletImage != null) {
-                g.drawImage(state.bulletImage, b.x, b.y, b.size, b.size, null);
-                continue;
-            }
-
-            Color c;
-            switch (state.bulletType) {
-                case TRIANGLE: c = new Color(100, 180, 255); break;
-                case CIRCLE:   c = new Color(255, 230, 120); break;
-                case SQUARE:   c = new Color(230, 250, 255); break;
-                default:       c = Color.YELLOW;
-            }
-            g.setColor(c);
-
-            switch (state.bulletType) {
-                case CIRCLE:
-                    g.fillOval(b.x, b.y, b.size, b.size);
-                    break;
-                case SQUARE:
-                    g.fillRect(b.x, b.y, b.size, b.size);
-                    break;
-                case TRIANGLE:
-                default: {
-                    int s = b.size;
-                    int[] xs = { b.x + s / 2, b.x, b.x + s };
-                    int[] ys = { b.y, b.y + s, b.y + s };
-                    g.fillPolygon(xs, ys, 3);
-                    break;
-                }
             }
         }
 
