@@ -100,8 +100,15 @@ public class Blade extends Bullet {
             if (bounceSfxCdMs <= 0) {
                 bounceSfxCdMs = 90;
                 try {
-                    // If you add a dedicated ricochet sound later, swap path here.
-                    AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_cis_blaster_fire.wav", 0.08f);
+                    AudioManager.get().playRandomSfx(
+                    0.20f,
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_02.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_03.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_04.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_06.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_08.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_12.wav"
+                );
                 } catch (Throwable ignored) {}
             }
 
@@ -151,7 +158,15 @@ public class Blade extends Bullet {
                 if (bounceSfxCdMs <= 0) {
                     bounceSfxCdMs = 90;
                     try {
-                        AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_cis_blaster_fire.wav", 0.08f);
+                       AudioManager.get().playRandomSfx(
+                    0.20f,
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_02.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_03.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_04.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_06.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_08.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_12.wav"
+                );
                     } catch (Throwable ignored) {}
                 }
             }
