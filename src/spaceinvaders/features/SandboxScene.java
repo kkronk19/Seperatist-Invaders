@@ -216,7 +216,7 @@ public class SandboxScene implements Scene {
 
             if (b instanceof Blade blade) {
                 // updateBlade handles bounce + (optional) split; returns children to add safely
-                List<Blade> spawned = blade.updateBlade(dtMs, state.width, state.height);
+                List<Bullet> spawned = blade.updateBlade(dtMs, state.width, state.height);
                 if (spawned != null && !spawned.isEmpty()) pendingAdds.addAll(spawned);
 
                 // remove if dead
