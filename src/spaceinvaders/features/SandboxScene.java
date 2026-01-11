@@ -1,16 +1,5 @@
 package spaceinvaders.features;
 
-import spaceinvaders.core.entities.Bullet;
-import spaceinvaders.core.GameState;
-import spaceinvaders.core.Scene;
-import spaceinvaders.core.SceneManager;
-import spaceinvaders.core.systems.CollisionSystem;
-import spaceinvaders.input.FireController;
-import spaceinvaders.weapons.BlasterWeapon;
-import spaceinvaders.weapons.MissileWeapon;
-import spaceinvaders.services.audio.AudioManager;
-import spaceinvaders.core.entities.Blade;
-
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Image;
@@ -19,6 +8,17 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import spaceinvaders.core.GameState;
+import spaceinvaders.core.Scene;
+import spaceinvaders.core.SceneManager;
+import spaceinvaders.core.entities.Blade;
+import spaceinvaders.core.entities.Bullet;
+import spaceinvaders.core.entities.Invader;
+import spaceinvaders.core.systems.CollisionSystem;
+import spaceinvaders.input.FireController;
+import spaceinvaders.services.audio.AudioManager;
+import spaceinvaders.weapons.BlasterWeapon;
+import spaceinvaders.weapons.MissileWeapon;
 
 /** Scene for free testing of weapons and enemies. */
 public class SandboxScene implements Scene {
@@ -30,7 +30,7 @@ public class SandboxScene implements Scene {
     private FireController fire;
 
     private final List<Bullet> bullets = new ArrayList<>();
-    private final List<GameState.Invader> invaders = new ArrayList<>();
+    private final List<Invader> invaders = new ArrayList<>();
 
     private boolean moveLeft, moveRight;
     private long nextSpawnMs = 0;
@@ -127,7 +127,7 @@ public class SandboxScene implements Scene {
         }
     }
 
-    /** Spawns two angled blades (±20° from vertical) if off cooldown. */
+    /** Spawns two angled blades if off cooldown. */
     private void tryFireBlades() {
         if (bladeCooldownMs > 0) return;
 
@@ -136,7 +136,6 @@ public class SandboxScene implements Scene {
 
         int vx = 14;
         int vy = -4;
-
         int size = 10;
 
         bullets.add(new Blade(
@@ -161,7 +160,6 @@ public class SandboxScene implements Scene {
 
         bladeCooldownMs = BLADE_COOLDOWN;
 
-        // Fire SFX (guarded)
         try {
             AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_blade_fire.wav", 0.25f);
         } catch (Throwable ignored) {}
@@ -180,14 +178,13 @@ public class SandboxScene implements Scene {
         if (moveRight) state.playerX += 8;
         state.playerX = Math.max(0, Math.min(state.playerX, state.width - state.playerWidth));
 
-        // --- Fire (run BEFORE the generic bullet update so missiles get their snake x) ---
+        // --- Fire ---
         int muzzleX = state.playerX + state.playerWidth / 2;
         int muzzleY = state.height - state.playerHeight - 10;
 
         if (fire != null) {
             List<Bullet> spawned = fire.tick(now, muzzleX, muzzleY, bullets, state.width, state.height);
 
-            // SFX for newly spawned bullets (guarded for missing assets)
             if (!spawned.isEmpty()) {
                 for (Bullet b : spawned) {
                     try {
@@ -203,7 +200,6 @@ public class SandboxScene implements Scene {
         }
 
         // --- Bullet movement ---
-        // Blades use updateBlade (for bounce/split); others use normal update
         List<Bullet> pendingAdds = new ArrayList<>();
 
         for (Iterator<Bullet> it = bullets.iterator(); it.hasNext();) {
@@ -226,13 +222,23 @@ public class SandboxScene implements Scene {
         // --- Invader spawning ---
         if (now > nextSpawnMs) {
             int x = rng.nextInt(Math.max(1, state.width - 50));
-            invaders.add(new GameState.Invader(x, -40, 40));
+
+            // quick test: half shielded, half basic
+            Invader.InvaderKind kind = Invader.InvaderKind.SHIELDED;
+
+            invaders.add(new Invader(
+                x, -40,
+                40, 40,
+                kind,
+                null
+            ));
+
             nextSpawnMs = now + 610 + rng.nextInt(600);
         }
 
         // --- Invader movement ---
-        for (Iterator<GameState.Invader> it = invaders.iterator(); it.hasNext();) {
-            GameState.Invader inv = it.next();
+        for (Iterator<Invader> it = invaders.iterator(); it.hasNext();) {
+            Invader inv = it.next();
             inv.y += 3;
             if (inv.y > state.height + 50) it.remove();
         }
@@ -251,19 +257,19 @@ public class SandboxScene implements Scene {
         g.setColor(Color.BLACK);
         g.fillRect(0, 0, width, height);
 
-        // bullets via renderers (if you have BladeRenderer registered, it will show)
+        // bullets via renderers
         for (Bullet b : bullets) {
             spaceinvaders.core.render.BulletRenderers.render(g, b, state);
         }
 
         // invaders
         Image invaderImg = state.invaderImage;
-        for (GameState.Invader inv : invaders) {
+        for (Invader inv : invaders) {
             if (invaderImg != null) {
-                g.drawImage(invaderImg, inv.x, inv.y, inv.size, inv.size, null);
+                g.drawImage(invaderImg, inv.x, inv.y, inv.width, inv.height, null);
             } else {
                 g.setColor(Color.GREEN);
-                g.fillRect(inv.x, inv.y, inv.size, inv.size);
+                g.fillRect(inv.x, inv.y, inv.width, inv.height);
             }
         }
 

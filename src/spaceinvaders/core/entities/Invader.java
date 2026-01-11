@@ -2,32 +2,40 @@ package spaceinvaders.core.entities;
 
 /** Represents a single enemy. Pure data + simple motion hook. */
 public class Invader {
+
     // Position & size (px)
     public int x, y;
     public int width, height;
 
-    // Velocity (px per tick) — used by simple patterns
+    // Velocity (px per tick)
     public int vx, vy;
 
     // Gameplay
     public int hp;              // hit points
     public int touchDamage;     // damage to player on collision
-    public int scoreValue;      // points awarded on death by shooter
+    public int scoreValue;      // points awarded on death
     public InvaderKind kind;
 
-    // Shielding: number of incoming HITS to absorb regardless of damage.
+    // Shielding: number of incoming HITS to absorb regardless of damage
     public int shieldHits;
 
     // Loot / drops
     public double dropChance;   // 0.0–1.0
-    public LootKind dropKind;   // optional (ammo, upgrade, etc.)
+    public LootKind dropKind;
 
     // Pattern / AI (strategy)
     public MovementPattern pattern;
 
     // Timing for pattern math
-    public long ageMs = 0;      // lifespan in ms (for pattern deployment logic)
-    public int spawnX;          // original x for strategic deployment variance
+    public long ageMs = 0;
+    public int spawnX;
+
+    /** Result of a hit attempt */
+    public enum HitResult {
+        ABSORBED,   // shield absorbed the hit, no HP damage
+        DAMAGED,    // HP reduced but still alive
+        KILLED      // HP reduced to zero or below
+    }
 
     public Invader(int x, int y, int w, int h, InvaderKind kind, MovementPattern pattern) {
         this.x = this.spawnX = x;
@@ -37,40 +45,52 @@ public class Invader {
         this.kind = kind;
         this.pattern = pattern;
 
-        // sensible defaults; tune per kind
-        this.vx = 0; this.vy = 2;
+        // defaults
+        this.vx = 0;
+        this.vy = 2;
         this.hp = 1;
         this.touchDamage = 1;
         this.scoreValue = 10;
 
-        // Shielded: absorbs exactly 1 impact (hit), regardless of damage
+        // Shielded enemies absorb exactly one hit
         this.shieldHits = (kind == InvaderKind.SHIELDED) ? 1 : 0;
 
         this.dropChance = 0.0;
         this.dropKind = LootKind.NONE;
     }
 
-    /** Apply a hit. Returns true if this hit killed the invader. */
-    public boolean takeHit(int damage) {
-        if (damage <= 0) return false;
-
-        // Shield consumes a whole hit regardless of damage amount
-        if (shieldHits > 0) {
-            shieldHits--;
-            return false;
+    /**
+     * Apply a hit and report what happened.
+     * Shield absorption does NOT deal HP damage.
+     */
+    public HitResult takeHit(int damage) {
+        if (damage <= 0) {
+            return HitResult.ABSORBED;
         }
 
+        // Shield absorbs entire hit
+        if (shieldHits > 0) {
+            shieldHits--;
+            return HitResult.ABSORBED;
+        }
+
+        // No shield → deal damage
         hp -= damage;
-        return hp <= 0;
+
+        if (hp <= 0) {
+            return HitResult.KILLED;
+        }
+
+        return HitResult.DAMAGED;
     }
 
-    /** Advance by dt milliseconds using the movement pattern. */
+    /** Advance using movement pattern (or fallback motion). */
     public void update(long dtMs, int panelW, int panelH) {
         ageMs += dtMs;
+
         if (pattern != null) {
             pattern.update(this, dtMs, panelW, panelH);
         } else {
-            // fallback: straight down using vy per tick (~frame)
             y += vy;
             x += vx;
         }
