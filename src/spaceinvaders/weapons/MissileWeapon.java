@@ -6,7 +6,7 @@ import spaceinvaders.core.entities.Missile;
 
 public class MissileWeapon implements Weapon {
     private final int cooldownMs = 500;
-    private final int vy = -10, size = 12, dmg = 2;
+    private final int vy = -10, size = 12, dmg = 6;
     private final double A = 36.0, W = 7.5;
     private final long maxLifeMs = 5000;
 

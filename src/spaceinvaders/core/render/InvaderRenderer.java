@@ -11,19 +11,44 @@ public final class InvaderRenderer {
     private InvaderRenderer() {}
 
     public static void render(Graphics2D g, Invader inv, GameState state) {
-        // swarmer reads a bit different
-        if (inv.kind == Invader.InvaderKind.SWARMER) {
+
+        // --- Kind-specific styling ---
+        boolean isTank = inv.kind == Invader.InvaderKind.TANK;
+        boolean isSwarmer = inv.kind == Invader.InvaderKind.SWARMER;
+
+        if (isSwarmer) {
             g.setColor(new Color(255, 230, 120, 160));
             g.drawRect(inv.x - 1, inv.y - 1, inv.width + 2, inv.height + 2);
         }
 
         // base invader
         Image invaderImg = state.invaderImage;
-        if (invaderImg != null) {
+        if (invaderImg != null && !isTank) {
+            // use normal sprite for non-tanks
             g.drawImage(invaderImg, inv.x, inv.y, inv.width, inv.height, null);
         } else {
-            g.setColor(Color.GREEN);
-            g.fillRect(inv.x, inv.y, inv.width, inv.height);
+            // fallback shapes or tank override
+            if (isTank) {
+                // darker armored body
+                g.setColor(new Color(80, 120, 80));
+                g.fillRect(inv.x, inv.y, inv.width, inv.height);
+
+                // armor plates
+                g.setColor(new Color(40, 70, 40));
+                g.fillRect(inv.x + 6, inv.y + 8, inv.width - 12, 10);
+                g.fillRect(inv.x + 6, inv.y + inv.height - 18, inv.width - 12, 10);
+
+                // core panel
+                g.setColor(new Color(120, 170, 120));
+                g.fillRect(inv.x + inv.width/4, inv.y + inv.height/3, inv.width/2, inv.height/3);
+
+                // outline
+                g.setColor(new Color(20, 40, 20));
+                g.drawRect(inv.x, inv.y, inv.width, inv.height);
+            } else {
+                g.setColor(Color.GREEN);
+                g.fillRect(inv.x, inv.y, inv.width, inv.height);
+            }
         }
 
         // shield overlay

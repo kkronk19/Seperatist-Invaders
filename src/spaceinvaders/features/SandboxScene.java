@@ -212,40 +212,65 @@ public class SandboxScene implements Scene {
 
         if (!pendingAdds.isEmpty()) bullets.addAll(pendingAdds);
 
+        
         // --- Invader spawning ---
         if (now > nextSpawnMs) {
-            int x = rng.nextInt(Math.max(1, state.width - 50));
+            int x = rng.nextInt(Math.max(1, state.width - 60));
 
-            // 50/50 swarmer vs shielded for testing
-            boolean spawnSwarmer = rng.nextDouble() < 0.5;
+            double roll = rng.nextDouble();
 
-            if (spawnSwarmer) {
+            if (roll < 0.25) {
+                // 25% BASIC
                 invaders.add(new Invader(
                     x, -40,
-                    26, 26,                       // smaller hitbox
-                    Invader.InvaderKind.SWARMER,
-                    new SwarmerZigZagPattern()     // zig-zag AI
+                    40, 40,
+                    Invader.InvaderKind.BASIC,
+                    null
                 ));
-            } else {
+
+            } else if (roll < 0.50) {
+                // 25% SHIELDED
                 invaders.add(new Invader(
                     x, -40,
                     40, 40,
                     Invader.InvaderKind.SHIELDED,
                     null
                 ));
+
+            } else if (roll < 0.75) {
+                // 25% SWARMER (small + zig-zag)
+                invaders.add(new Invader(
+                    x, -40,
+                    26, 26,
+                    Invader.InvaderKind.SWARMER,
+                    new SwarmerZigZagPattern()
+                ));
+
+            } else {
+                // 25% TANK (big + high hp, no special movement yet)
+                Invader t = new Invader(
+                    x, -60,
+                    56, 56,
+                    Invader.InvaderKind.TANK,
+                    null
+                );
+                t.hp = 6;
+                t.vy = 1;
+                t.scoreValue = 40;
+                t.touchDamage = 2;
+                invaders.add(t);
             }
 
             nextSpawnMs = now + 610 + rng.nextInt(600);
         }
 
+
         // --- Invader movement + timers ---
         for (Iterator<Invader> it = invaders.iterator(); it.hasNext();) {
             Invader inv = it.next();
 
-            // run pattern (or fallback)
             inv.update(dtMs, state.width, state.height);
 
-            // shield flash timer (if you want it active)
             if (inv.shieldBreakFlashMs > 0) {
                 inv.shieldBreakFlashMs = Math.max(0, inv.shieldBreakFlashMs - dtMs);
             }
