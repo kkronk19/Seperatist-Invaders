@@ -38,29 +38,56 @@ public class MissileWeapon implements Weapon {
             long age = nowMs - t0;
             if (age > maxLifeMs) { born.remove(m); x0.remove(m); continue; }
 
-            // If deflected: fly straight (do NOT override x with sine)
+            // snake path (absolute x) ONLY when not in straightFlight
             if (!m.straightFlight) {
                 double t = age / 1000.0;
                 double centerX = ox + A * Math.sin(W * t);
                 m.x = (int)Math.round(centerX - m.size / 2.0);
-            } else {
-                // Optional: lock the x0 so it doesn't "snap" if straightFlight toggles mid-frame
-                if (m.straightX0 == null) {
-                    m.straightX0 = m.x + m.size / 2;
-                }
             }
 
-            // Trail particles (always)
-            int cx = m.x + m.size / 2;
-            int cy = m.y + m.size;
-            int r  = 2 + rng.nextInt(2);
-            m.trail.add(new Missile.Particle(cx, cy, r, 1.0f));
+            // ------------------------------------------------------------
+            // Trail spawn at missile "tail" along velocity direction
+            // ------------------------------------------------------------
+            double vx = m.vx;
+            double vy = m.vy;
+            double len = Math.hypot(vx, vy);
+
+            // if velocity is degenerate, assume upward
+            double nx, ny;
+            if (len < 0.001) {
+                nx = 0.0;
+                ny = -1.0;
+            } else {
+                nx = vx / len;
+                ny = vy / len;
+            }
+
+            // center of missile
+            double cx = m.x + m.size / 2.0;
+            double cy = m.y + m.size / 2.0;
+
+            // tail point is opposite direction of travel
+            double tailDist = m.size * 0.55; // tweak for "behind the body"
+            int tx = (int)Math.round(cx - nx * tailDist);
+            int ty = (int)Math.round(cy - ny * tailDist);
+
+            int r  = 2 + rng.nextInt(2);     // 2..3 px
+            m.trail.add(new Missile.Particle(tx, ty, r, 1.0f));
+
+            // fade + drift particles opposite the missile direction
+            // (small drift looks like exhaust; not always "down")
+            double drift = 0.9;
+            int driftX = (int)Math.round(-nx * drift);
+            int driftY = (int)Math.round(-ny * drift);
 
             for (Iterator<Missile.Particle> it = m.trail.iterator(); it.hasNext();) {
                 Missile.Particle p = it.next();
-                p.alpha *= 0.86f;
-                p.y += 1;
-                if (p.alpha < 0.08f || m.trail.size() > 28) it.remove();
+                p.alpha *= 0.90f; // slower fade (longer trail)
+                p.x += driftX;
+                p.y += driftY;
+
+                // cap trail length a bit higher so it doesn't feel "too short"
+                if (p.alpha < 0.06f || m.trail.size() > 42) it.remove();
             }
         }
 
