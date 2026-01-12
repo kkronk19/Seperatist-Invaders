@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Missile extends Bullet {
+    
+    public boolean straightFlight = false;
+    public Integer straightX0 = null;
 
     /** Simple particle for the exhaust trail. */
     public static final class Particle {

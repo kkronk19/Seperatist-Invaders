@@ -7,6 +7,7 @@ import java.util.List;
 import spaceinvaders.core.entities.Blade;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.Invader;
+import spaceinvaders.core.entities.Missile;
 import spaceinvaders.services.audio.AudioManager;
 
 public final class CollisionSystem {
@@ -16,6 +17,13 @@ public final class CollisionSystem {
     }
 
     private CollisionSystem() {}
+
+    private static final String SFX_REFLECT_1 = "/spaceinvaders/resources/audio/sfx/reflect1.wav";
+    private static final String SFX_REFLECT_2 = "/spaceinvaders/resources/audio/sfx/reflect2.wav";
+    private static final String SFX_REFLECT_3 = "/spaceinvaders/resources/audio/sfx/reflect3.wav";
+    private static final String SFX_SHIELD_DEPLETED = "/spaceinvaders/resources/audio/sfx/shield_depleted.wav";
+
+    private static final double ROCKET_DEFLECT_CHANCE = 0.25;
 
     /** Bullet vs Invader collisions. Mutates lists safely. */
     public static void bulletsVsInvaders(
@@ -41,16 +49,14 @@ public final class CollisionSystem {
 
                 if (!br.intersects(ir)) continue;
 
-                // ---- HIT ----
                 hitSomething = true;
 
-                // apply shield/hp rules
+                boolean hadShield = inv.shieldHits > 0;
                 Invader.HitResult res = inv.takeHit(b.damage);
+                boolean shieldBroke = hadShield && inv.shieldHits == 0 && res == Invader.HitResult.ABSORBED;
 
                 if (res == Invader.HitResult.KILLED) {
                     iit.remove();
-
-                    // death sfx only on kill
                     AudioManager.get().playRandomSfx(
                         1.1f,
                         "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
@@ -59,37 +65,90 @@ public final class CollisionSystem {
                     );
                 }
 
-                // Special: blade vs shield absorb => bounce blade, don't consume pierce
-                if (res == Invader.HitResult.ABSORBED && b instanceof Blade) {
-                    // flip vertical to get it away from the invader (prevents immediate re-hit)
-                    b.vy = -b.vy;
+                // --------------------------
+                // SHIELD ABSORBS
+                // --------------------------
+                if (res == Invader.HitResult.ABSORBED) {
 
-                    // nudge out of the invader hitbox so it won't intersect next tick
-                    if (b.vy > 0) {
-                        // now moving down
-                        b.y = inv.y + inv.height + 2;
-                    } else {
-                        // now moving up
-                        b.y = inv.y - b.size - 2;
+                    // Blade vs shield: reflect + bounce, don't consume pierce
+                    if (b instanceof Blade) {
+                        try { AudioManager.get().playRandomSfx(0.40f, SFX_REFLECT_1, SFX_REFLECT_2, SFX_REFLECT_3); }
+                        catch (Throwable ignored) {}
+
+                        if (shieldBroke) {
+                            try { AudioManager.get().playSfx(SFX_SHIELD_DEPLETED, 0.60f); } catch (Throwable ignored) {}
+                        }
+
+                        b.vy = -b.vy;
+                        if (b.vy > 0) b.y = inv.y + inv.height + 2;
+                        else          b.y = inv.y - b.size - 2;
+
+                        removeBullet = false;
                     }
 
-                    // blade stays alive
-                    removeBullet = false;
-                } else {
-                    // normal bullet behavior on hit
-                    if (b.kind == Bullet.BulletKind.MISSILE) {
-                        int cx = b.x + b.size / 2;
-                        int cy = b.y + b.size / 2;
-                        if (shrapnelSpawner != null) pendingAdds.addAll(shrapnelSpawner.spawnShrapnel(cx, cy));
-                        removeBullet = true;
-                    } else if (b instanceof Blade blade) {
-                        removeBullet = blade.onHitInvader();
-                    } else {
+                    // Missile vs shield: 25% deflect (KEEP missile look + trail, NO SINE)
+                    else if (b.kind == Bullet.BulletKind.MISSILE) {
+                        boolean deflect = Math.random() < ROCKET_DEFLECT_CHANCE;
+
+                        if (deflect) {
+                            try { AudioManager.get().playRandomSfx(0.45f, SFX_REFLECT_1, SFX_REFLECT_2, SFX_REFLECT_3); }
+                            catch (Throwable ignored) {}
+
+                            if (shieldBroke) {
+                                try { AudioManager.get().playSfx(SFX_SHIELD_DEPLETED, 0.60f); } catch (Throwable ignored) {}
+                            }
+
+                            // Keep it a Missile so it renders with rocket look + trail.
+                            // Disable snake path by toggling straightFlight (handled in MissileWeapon.updateBullets)
+                            if (b instanceof Missile m) {
+                                m.straightFlight = true;
+                            }
+
+                            // new straight trajectory: up + left/right
+                            b.vy = -1;
+                            b.vx = (Math.random() < 0.5) ? -4 : 4;
+
+                            // nudge above invader so it doesn't immediately collide again
+                            b.y = inv.y - b.size - 2;
+
+                            removeBullet = false; // keep missile alive
+                        } else {
+                            // not deflected: normal explode-on-hit behavior
+                            int cx = b.x + b.size / 2;
+                            int cy = b.y + b.size / 2;
+                            if (shrapnelSpawner != null) pendingAdds.addAll(shrapnelSpawner.spawnShrapnel(cx, cy));
+                            removeBullet = true;
+                        }
+                    }
+
+                    // Other bullets absorbed by shield
+                    else {
+                        if (shieldBroke) {
+                            try { AudioManager.get().playSfx(SFX_SHIELD_DEPLETED, 0.60f); } catch (Throwable ignored) {}
+                        }
                         removeBullet = true;
                     }
+
+                    break;
                 }
 
-                break; // one invader hit per bullet per frame
+                // --------------------------
+                // NORMAL HIT (not absorbed)
+                // --------------------------
+                boolean explode = (b.kind == Bullet.BulletKind.MISSILE) || b.explodesOnHit;
+
+                if (explode) {
+                    int cx = b.x + b.size / 2;
+                    int cy = b.y + b.size / 2;
+                    if (shrapnelSpawner != null) pendingAdds.addAll(shrapnelSpawner.spawnShrapnel(cx, cy));
+                    removeBullet = true;
+                } else if (b instanceof Blade blade) {
+                    removeBullet = blade.onHitInvader();
+                } else {
+                    removeBullet = true;
+                }
+
+                break;
             }
 
             if (hitSomething && removeBullet) bit.remove();

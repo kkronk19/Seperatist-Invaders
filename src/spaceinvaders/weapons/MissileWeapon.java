@@ -1,8 +1,8 @@
 package spaceinvaders.weapons;
 
+import java.util.*;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.Missile;
-import java.util.*;
 
 public class MissileWeapon implements Weapon {
     private final int cooldownMs = 500;
@@ -20,7 +20,6 @@ public class MissileWeapon implements Weapon {
         if (nowMs - lastShot < cooldownMs) return;
         lastShot = nowMs;
 
-        // 🔄 spawn an actual Missile (not a plain Bullet)
         Missile m = new Missile(mx - size/2, my, 0, vy, size, dmg);
         out.add(m);
         born.put(m, nowMs);
@@ -39,22 +38,28 @@ public class MissileWeapon implements Weapon {
             long age = nowMs - t0;
             if (age > maxLifeMs) { born.remove(m); x0.remove(m); continue; }
 
-            // snake path (absolute x)
-            double t = age / 1000.0;
-            double centerX = ox + A * Math.sin(W * t);
-            m.x = (int)Math.round(centerX - m.size / 2.0);
+            // If deflected: fly straight (do NOT override x with sine)
+            if (!m.straightFlight) {
+                double t = age / 1000.0;
+                double centerX = ox + A * Math.sin(W * t);
+                m.x = (int)Math.round(centerX - m.size / 2.0);
+            } else {
+                // Optional: lock the x0 so it doesn't "snap" if straightFlight toggles mid-frame
+                if (m.straightX0 == null) {
+                    m.straightX0 = m.x + m.size / 2;
+                }
+            }
 
-            // 🔸 trail: add a particle at the missile tail
+            // Trail particles (always)
             int cx = m.x + m.size / 2;
-            int cy = m.y + m.size;           // slightly behind
-            int r  = 2 + rng.nextInt(2);     // 2..3 px
+            int cy = m.y + m.size;
+            int r  = 2 + rng.nextInt(2);
             m.trail.add(new Missile.Particle(cx, cy, r, 1.0f));
 
-            // fade + drift particles
             for (Iterator<Missile.Particle> it = m.trail.iterator(); it.hasNext();) {
                 Missile.Particle p = it.next();
-                p.alpha *= 0.86f;   // fade
-                p.y += 1;           // small downward drift
+                p.alpha *= 0.86f;
+                p.y += 1;
                 if (p.alpha < 0.08f || m.trail.size() > 28) it.remove();
             }
         }
