@@ -15,12 +15,16 @@ public class Invader {
     public int touchDamage;     // damage to player on collision
     public int scoreValue;      // points awarded on death
     public InvaderKind kind;
-    
+
     // Visual feedback
     public int shieldBreakFlashMs = 0;
 
     // Shielding: number of incoming HITS to absorb regardless of damage
     public int shieldHits;
+
+    // Swarmer pattern state (used by SwarmerZigZagPattern)
+    public int swarmDir = 0;          // -1 left, 0 down, +1 right
+    public int swarmDirTimerMs = 0;   // ms until direction reroll
 
     // Loot / drops
     public double dropChance;   // 0.0–1.0

@@ -11,6 +11,12 @@ public final class InvaderRenderer {
     private InvaderRenderer() {}
 
     public static void render(Graphics2D g, Invader inv, GameState state) {
+        // swarmer reads a bit different
+        if (inv.kind == Invader.InvaderKind.SWARMER) {
+            g.setColor(new Color(255, 230, 120, 160));
+            g.drawRect(inv.x - 1, inv.y - 1, inv.width + 2, inv.height + 2);
+        }
+
         // base invader
         Image invaderImg = state.invaderImage;
         if (invaderImg != null) {
@@ -31,8 +37,5 @@ public final class InvaderRenderer {
             g.setColor(new Color(200, 240, 255, 120));
             g.drawArc(inv.x - 2, inv.y - 2, inv.width + 4, inv.height + 4, 40, 80);
         }
-
-        // (optional) If you later add a shield break flash timer on Invader, draw it here too.
-        // e.g. inv.shieldBreakFlashMs > 0 -> draw rings
     }
 }

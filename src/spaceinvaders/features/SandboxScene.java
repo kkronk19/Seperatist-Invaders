@@ -14,6 +14,7 @@ import spaceinvaders.core.SceneManager;
 import spaceinvaders.core.entities.Blade;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.Invader;
+import spaceinvaders.core.entities.SwarmerZigZagPattern;
 import spaceinvaders.core.systems.CollisionSystem;
 import spaceinvaders.input.FireController;
 import spaceinvaders.services.audio.AudioManager;
@@ -215,15 +216,24 @@ public class SandboxScene implements Scene {
         if (now > nextSpawnMs) {
             int x = rng.nextInt(Math.max(1, state.width - 50));
 
-            // quick test: always shielded
-            Invader.InvaderKind kind = Invader.InvaderKind.SHIELDED;
+            // 50/50 swarmer vs shielded for testing
+            boolean spawnSwarmer = rng.nextDouble() < 0.5;
 
-            invaders.add(new Invader(
-                x, -40,
-                40, 40,
-                kind,
-                null
-            ));
+            if (spawnSwarmer) {
+                invaders.add(new Invader(
+                    x, -40,
+                    26, 26,                       // smaller hitbox
+                    Invader.InvaderKind.SWARMER,
+                    new SwarmerZigZagPattern()     // zig-zag AI
+                ));
+            } else {
+                invaders.add(new Invader(
+                    x, -40,
+                    40, 40,
+                    Invader.InvaderKind.SHIELDED,
+                    null
+                ));
+            }
 
             nextSpawnMs = now + 610 + rng.nextInt(600);
         }
@@ -232,10 +242,13 @@ public class SandboxScene implements Scene {
         for (Iterator<Invader> it = invaders.iterator(); it.hasNext();) {
             Invader inv = it.next();
 
-            inv.y += 3;
+            // run pattern (or fallback)
+            inv.update(dtMs, state.width, state.height);
 
-            // If you later add inv.shieldBreakFlashMs (recommended), tick it down here:
-            // inv.shieldBreakFlashMs = Math.max(0, inv.shieldBreakFlashMs - dtMs);
+            // shield flash timer (if you want it active)
+            if (inv.shieldBreakFlashMs > 0) {
+                inv.shieldBreakFlashMs = Math.max(0, inv.shieldBreakFlashMs - dtMs);
+            }
 
             if (inv.y > state.height + 50) it.remove();
         }
@@ -250,21 +263,17 @@ public class SandboxScene implements Scene {
 
     @Override
     public void render(Graphics2D g, int width, int height) {
-        // background
         g.setColor(Color.BLACK);
         g.fillRect(0, 0, width, height);
 
-        // bullets via renderers
         for (Bullet b : bullets) {
             spaceinvaders.core.render.BulletRenderers.render(g, b, state);
         }
 
-        // invaders via dedicated renderer (NEW)
         for (Invader inv : invaders) {
             spaceinvaders.core.render.InvaderRenderer.render(g, inv, state);
         }
 
-        // player
         Image playerImg = state.playerImage;
         int px = state.playerX;
         int py = height - state.playerHeight - 10;
