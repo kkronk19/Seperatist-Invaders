@@ -1,10 +1,9 @@
 package spaceinvaders.core.entities;
 
-import spaceinvaders.services.audio.AudioManager;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import spaceinvaders.services.audio.AudioManager;
 
 public class Blade extends Bullet {
 
@@ -34,7 +33,7 @@ public class Blade extends Bullet {
     private final boolean verticalBounceEnabled;
 
     private int lifeMs = 0;
-    private final int maxLifeMs = 4500; // safety
+    private final int maxLifeMs = 9000; // safety
 
     public Blade(int x, int y, int vx, int vy, int size,
                  int bouncesRemaining,

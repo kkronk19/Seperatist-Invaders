@@ -35,7 +35,6 @@ public class SandboxScene implements Scene {
     private boolean moveLeft, moveRight;
     private long nextSpawnMs = 0;
 
-    // CHANGED: return shards instead of mutating bullets during iteration
     private List<Bullet> spawnShrapnel(int cx, int cy) {
         final int shards = 5;
         final int size   = 6;
@@ -56,17 +55,12 @@ public class SandboxScene implements Scene {
 
     // --- Blade weapon config / upgrades ---
     private int bladeCooldownMs = 0;
-
-    // "fires about same as missile"
     private static final int BLADE_COOLDOWN = 850;
-
-    // base blade stats
     private static final int BLADE_PIERCE  = 3;
     private static final int BLADE_BOUNCES = 3;
 
-    // upgrades (flip these later from your upgrade system)
-    private boolean bladeVerticalBounce = false;     // top/bottom do not despawn (bounce instead)
-    private boolean bladeLegendarySplit = false;     // first side-bounce spawns 2
+    private boolean bladeVerticalBounce = false;
+    private boolean bladeLegendarySplit = false;
 
     public SandboxScene(GameState state, SceneManager scenes) {
         this.state = state;
@@ -79,10 +73,8 @@ public class SandboxScene implements Scene {
         state.mode = GameState.AppMode.SANDBOX;
         state.playerX = state.width / 2 - state.playerWidth / 2;
 
-        // Weapons: Space (primary hold), R (secondary tap)
         fire = new FireController(new BlasterWeapon(), new MissileWeapon());
 
-        // Safe even if nothing is playing
         try { AudioManager.get().stopLoop("menu"); } catch (Throwable ignored) {}
     }
 
@@ -103,11 +95,11 @@ public class SandboxScene implements Scene {
                 if (fire != null) fire.setPrimaryHeld(true);
                 break;
 
-            case KeyEvent.VK_R:     // missile tap
+            case KeyEvent.VK_R:
                 if (fire != null) fire.triggerSecondaryTap();
                 break;
 
-            case KeyEvent.VK_F:     // BLADE weapon
+            case KeyEvent.VK_F:
                 tryFireBlades();
                 break;
         }
@@ -223,7 +215,7 @@ public class SandboxScene implements Scene {
         if (now > nextSpawnMs) {
             int x = rng.nextInt(Math.max(1, state.width - 50));
 
-            // quick test: half shielded, half basic
+            // quick test: always shielded
             Invader.InvaderKind kind = Invader.InvaderKind.SHIELDED;
 
             invaders.add(new Invader(
@@ -236,14 +228,19 @@ public class SandboxScene implements Scene {
             nextSpawnMs = now + 610 + rng.nextInt(600);
         }
 
-        // --- Invader movement ---
+        // --- Invader movement + timers ---
         for (Iterator<Invader> it = invaders.iterator(); it.hasNext();) {
             Invader inv = it.next();
+
             inv.y += 3;
+
+            // If you later add inv.shieldBreakFlashMs (recommended), tick it down here:
+            // inv.shieldBreakFlashMs = Math.max(0, inv.shieldBreakFlashMs - dtMs);
+
             if (inv.y > state.height + 50) it.remove();
         }
 
-        // --- Collisions (MOVED OUT) ---
+        // --- Collisions ---
         CollisionSystem.bulletsVsInvaders(
             bullets,
             invaders,
@@ -262,15 +259,9 @@ public class SandboxScene implements Scene {
             spaceinvaders.core.render.BulletRenderers.render(g, b, state);
         }
 
-        // invaders
-        Image invaderImg = state.invaderImage;
+        // invaders via dedicated renderer (NEW)
         for (Invader inv : invaders) {
-            if (invaderImg != null) {
-                g.drawImage(invaderImg, inv.x, inv.y, inv.width, inv.height, null);
-            } else {
-                g.setColor(Color.GREEN);
-                g.fillRect(inv.x, inv.y, inv.width, inv.height);
-            }
+            spaceinvaders.core.render.InvaderRenderer.render(g, inv, state);
         }
 
         // player

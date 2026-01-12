@@ -4,6 +4,7 @@ import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+
 import spaceinvaders.core.entities.Blade;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.Invader;
