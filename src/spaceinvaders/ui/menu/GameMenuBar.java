@@ -1,16 +1,14 @@
 package spaceinvaders.ui.menu;
 
-import spaceinvaders.core.GameState;
-import spaceinvaders.services.audio.MusicPlayer;
-import spaceinvaders.services.loading.AssetLoader;
-import spaceinvaders.services.exceptions.GameExceptions;
-
-import javax.imageio.ImageIO;
-import javax.swing.*;
 import java.awt.Image;
-import java.awt.Component;
 import java.io.File;
 import java.net.URI;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import spaceinvaders.core.GameState;
+import spaceinvaders.services.audio.MusicPlayer;
+import spaceinvaders.services.exceptions.GameExceptions;
+import spaceinvaders.services.loading.AssetLoader;
 
 /** Menubar that configures images, bullet type, and music. */
 public class GameMenuBar extends JMenuBar {
@@ -67,6 +65,7 @@ public class GameMenuBar extends JMenuBar {
             return;
         }
         state.invaderImage = img;
+        state.invaderImageBasic = img; 
         repaintTarget.repaint();
     }
 
