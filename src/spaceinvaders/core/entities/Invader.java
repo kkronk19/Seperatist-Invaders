@@ -22,9 +22,12 @@ public class Invader {
     // Shielding: number of incoming HITS to absorb regardless of damage
     public int shieldHits;
 
-    // Swarmer pattern state (used by SwarmerZigZagPattern)
+    // Swarmer/Shooter pattern state
     public int swarmDir = 0;          // -1 left, 0 down, +1 right
     public int swarmDirTimerMs = 0;   // ms until direction reroll
+
+    // Shooter: set true by pattern when it should fire this frame
+    public boolean firePending = false;
 
     // Loot / drops
     public double dropChance;   // 0.0–1.0

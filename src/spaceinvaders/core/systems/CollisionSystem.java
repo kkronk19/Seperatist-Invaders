@@ -4,9 +4,9 @@ import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
 import spaceinvaders.core.entities.Blade;
 import spaceinvaders.core.entities.Bullet;
+import spaceinvaders.core.entities.EnemyBullet;   // <-- ADD THIS
 import spaceinvaders.core.entities.Invader;
 import spaceinvaders.core.entities.Missile;
 import spaceinvaders.services.audio.AudioManager;
@@ -39,6 +39,12 @@ public final class CollisionSystem {
 
         for (Iterator<Bullet> bit = bullets.iterator(); bit.hasNext();) {
             Bullet b = bit.next();
+
+            // ✅ Enemy bullets should NEVER hit invaders (prevents shooter "suicide")
+            if (b instanceof EnemyBullet) {
+                continue;
+            }
+
             br.setBounds(b.x, b.y, b.size, b.size);
 
             boolean removeBullet = false;
@@ -99,22 +105,16 @@ public final class CollisionSystem {
                                 try { AudioManager.get().playSfx(SFX_SHIELD_DEPLETED, 0.60f); } catch (Throwable ignored) {}
                             }
 
-                            // Keep it a Missile so it renders with rocket look + trail.
-                            // Disable snake path by toggling straightFlight (handled in MissileWeapon.updateBullets)
                             if (b instanceof Missile m) {
                                 m.straightFlight = true;
                             }
 
-                            // new straight trajectory: up + left/right
                             b.vy = -1;
                             b.vx = (Math.random() < 0.5) ? -4 : 4;
-
-                            // nudge above invader so it doesn't immediately collide again
                             b.y = inv.y - b.size - 2;
 
-                            removeBullet = false; // keep missile alive
+                            removeBullet = false;
                         } else {
-                            // not deflected: normal explode-on-hit behavior
                             int cx = b.x + b.size / 2;
                             int cy = b.y + b.size / 2;
                             if (shrapnelSpawner != null) pendingAdds.addAll(shrapnelSpawner.spawnShrapnel(cx, cy));
