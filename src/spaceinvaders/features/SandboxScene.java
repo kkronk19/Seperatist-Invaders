@@ -153,7 +153,8 @@ public class SandboxScene implements Scene {
             BLADE_BOUNCES,
             BLADE_PIERCE,
             bladeLegendarySplit,
-            bladeVerticalBounce
+            bladeVerticalBounce,
+            false
         ));
 
         bullets.add(new Blade(
@@ -163,7 +164,8 @@ public class SandboxScene implements Scene {
             BLADE_BOUNCES,
             BLADE_PIERCE,
             bladeLegendarySplit,
-            bladeVerticalBounce
+            bladeVerticalBounce,
+            false
         ));
 
         bladeCooldownMs = BLADE_COOLDOWN;

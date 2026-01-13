@@ -40,6 +40,10 @@ public class Invader {
     public long ageMs = 0;
     public int spawnX;
 
+    // armored that prevents pierced shots
+    public boolean armored = false;
+
+
     /** Result of a hit attempt */
     public enum HitResult {
         ABSORBED,   // shield absorbed the hit, no HP damage
@@ -54,6 +58,7 @@ public class Invader {
         this.height = h;
         this.kind = kind;
         this.pattern = pattern;
+        this.armored = (kind == InvaderKind.TANK);
 
         // defaults
         this.vx = 0;

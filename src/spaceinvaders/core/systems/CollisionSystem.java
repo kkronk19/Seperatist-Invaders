@@ -67,9 +67,7 @@ public final class CollisionSystem {
             Bullet b = bit.next();
 
             // Enemy bullets should NEVER collide with invaders
-            if (b instanceof EnemyBullet) {
-                continue;
-            }
+            if (b instanceof EnemyBullet) continue;
 
             br.setBounds(b.x, b.y, b.size, b.size);
 
@@ -85,7 +83,20 @@ public final class CollisionSystem {
                 hitSomething = true;
 
                 boolean hadShield = inv.shieldHits > 0;
-                Invader.HitResult res = inv.takeHit(b.damage);
+
+                // --- Armor rule (only for blades) ---
+                int appliedDamage = b.damage;
+                boolean forceBladeStop = false;
+
+                if (b instanceof Blade blade) {
+                    if (inv.armored && !blade.armorPiercing) {
+                        appliedDamage = 1;     // always 1 dmg vs armor if not AP
+                        forceBladeStop = true; // consume ALL pierce after this hit
+                    }
+                }
+
+                Invader.HitResult res = inv.takeHit(appliedDamage);
+
                 boolean shieldBroke = hadShield && inv.shieldHits == 0 && res == Invader.HitResult.ABSORBED;
 
                 if (res == Invader.HitResult.KILLED) {
@@ -164,13 +175,20 @@ public final class CollisionSystem {
                     int cy = b.y + b.size / 2;
                     if (shrapnelSpawner != null) pendingAdds.addAll(shrapnelSpawner.spawnShrapnel(cx, cy));
                     removeBullet = true;
+
                 } else if (b instanceof Blade blade) {
-                    removeBullet = blade.onHitInvader();
+                    if (forceBladeStop) {
+                        blade.consumeAllPierce(); // consume all penetration and despawn
+                        removeBullet = true;
+                    } else {
+                        removeBullet = blade.onHitInvader();
+                    }
+
                 } else {
                     removeBullet = true;
                 }
 
-                break;
+                break; // one invader hit per bullet per frame
             }
 
             if (hitSomething && removeBullet) bit.remove();
