@@ -29,6 +29,27 @@ public final class CollisionSystem {
     private static final String SFX_TANK_DEATH_2 = "/spaceinvaders/resources/audio/sfx/tank_death2.wav";
     private static final String SFX_TANK_DEATH_3 = "/spaceinvaders/resources/audio/sfx/tank_death3.wav";
 
+    // swarmer death sounds
+    private static final String SFX_SWARMER_DEATH_1 = "/spaceinvaders/resources/audio/sfx/bz_droid_death1.wav";
+    private static final String SFX_SWARMER_DEATH_2 = "/spaceinvaders/resources/audio/sfx/bz_droid_death2.wav";
+    private static final String SFX_SWARMER_DEATH_3 = "/spaceinvaders/resources/audio/sfx/bz_droid_death3.wav";
+    private static final String SFX_SWARMER_DEATH_4 = "/spaceinvaders/resources/audio/sfx/bz_droid_death4.wav";
+    private static final String SFX_SWARMER_DEATH_5 = "/spaceinvaders/resources/audio/sfx/bz_droid_death5.wav";
+    private static final String SFX_SWARMER_DEATH_6 = "/spaceinvaders/resources/audio/sfx/bz_droid_death6.wav";
+    private static final String SFX_SWARMER_DEATH_7 = "/spaceinvaders/resources/audio/sfx/bz_droid_death7.wav";
+
+    // shielded death sounds
+    private static final String SFX_SHIELDED_DEATH_1 = "/spaceinvaders/resources/audio/sfx/droideka_death1.wav";
+    private static final String SFX_SHIELDED_DEATH_2 = "/spaceinvaders/resources/audio/sfx/droideka_death2.wav";
+    private static final String SFX_SHIELDED_DEATH_3 = "/spaceinvaders/resources/audio/sfx/droideka_death3.wav";
+    private static final String SFX_SHIELDED_DEATH_4 = "/spaceinvaders/resources/audio/sfx/droideka_death4.wav";
+
+    // shooter death sounds
+    private static final String SFX_SHOOTER_DEATH_1 = "/spaceinvaders/resources/audio/sfx/commando_droid_death1.wav";
+    private static final String SFX_SHOOTER_DEATH_2 = "/spaceinvaders/resources/audio/sfx/commando_droid_death2.wav";
+    private static final String SFX_SHOOTER_DEATH_3 = "/spaceinvaders/resources/audio/sfx/commando_droid_death3.wav";
+    private static final String SFX_SHOOTER_DEATH_4 = "/spaceinvaders/resources/audio/sfx/commando_droid_death4.wav";
+
     private static final double ROCKET_DEFLECT_CHANCE = 0.25;
 
     /** Bullet vs Invader collisions. Mutates lists safely. */
@@ -45,7 +66,7 @@ public final class CollisionSystem {
         for (Iterator<Bullet> bit = bullets.iterator(); bit.hasNext();) {
             Bullet b = bit.next();
 
-            //enemy bullets should NEVER collide with invaders
+            // Enemy bullets should NEVER collide with invaders
             if (b instanceof EnemyBullet) {
                 continue;
             }
@@ -69,27 +90,7 @@ public final class CollisionSystem {
 
                 if (res == Invader.HitResult.KILLED) {
                     iit.remove();
-
-                    // tank death sfx
-                    if (inv.kind == Invader.InvaderKind.TANK) {
-                        try {
-                            AudioManager.get().playRandomSfx(
-                                    0.90f,
-                                    SFX_TANK_DEATH_1,
-                                    SFX_TANK_DEATH_2,
-                                    SFX_TANK_DEATH_3
-                            );
-                        } catch (Throwable ignored) {}
-                    } else {
-                        try {
-                            AudioManager.get().playRandomSfx(
-                                    1.1f,
-                                    "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
-                                    "/spaceinvaders/resources/audio/sfx/CICOM408.wav",
-                                    "/spaceinvaders/resources/audio/sfx/CICOM409.wav"
-                            );
-                        } catch (Throwable ignored) {}
-                    }
+                    try { playDeathSfxFor(inv); } catch (Throwable ignored) {}
                 }
 
                 // --------------------------
@@ -176,5 +177,45 @@ public final class CollisionSystem {
         }
 
         if (!pendingAdds.isEmpty()) bullets.addAll(pendingAdds);
+    }
+
+    private static void playDeathSfxFor(Invader inv) {
+        switch (inv.kind) {
+            case TANK:
+                AudioManager.get().playRandomSfx(0.90f, SFX_TANK_DEATH_1, SFX_TANK_DEATH_2, SFX_TANK_DEATH_3);
+                break;
+
+            case SWARMER:
+                AudioManager.get().playRandomSfx(
+                        0.85f,
+                        SFX_SWARMER_DEATH_1, SFX_SWARMER_DEATH_2, SFX_SWARMER_DEATH_3,
+                        SFX_SWARMER_DEATH_4, SFX_SWARMER_DEATH_5, SFX_SWARMER_DEATH_6, SFX_SWARMER_DEATH_7
+                );
+                break;
+
+            case SHIELDED:
+                AudioManager.get().playRandomSfx(
+                        0.95f,
+                        SFX_SHIELDED_DEATH_1, SFX_SHIELDED_DEATH_2, SFX_SHIELDED_DEATH_3, SFX_SHIELDED_DEATH_4
+                );
+                break;
+
+            case SHOOTER:
+                AudioManager.get().playRandomSfx(
+                        0.95f,
+                        SFX_SHOOTER_DEATH_1, SFX_SHOOTER_DEATH_2, SFX_SHOOTER_DEATH_3, SFX_SHOOTER_DEATH_4
+                );
+                break;
+
+            case BASIC:
+            default:
+                AudioManager.get().playRandomSfx(
+                        1.1f,
+                        "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
+                        "/spaceinvaders/resources/audio/sfx/CICOM408.wav",
+                        "/spaceinvaders/resources/audio/sfx/CICOM409.wav"
+                );
+                break;
+        }
     }
 }

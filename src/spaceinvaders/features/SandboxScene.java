@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
-
 import spaceinvaders.core.GameState;
 import spaceinvaders.core.Scene;
 import spaceinvaders.core.SceneManager;
@@ -200,7 +199,7 @@ public class SandboxScene implements Scene {
                         if (b.kind == Bullet.BulletKind.MISSILE) {
                             AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_ywing_torpedo_fire.wav", 0.18f);
                         } else {
-                            AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_cis_blaster_fire.wav", 0.15f);
+                            AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/ct_blaster_fire.wav", 0.15f);
                         }
                     } catch (Throwable ignored) {}
                 }

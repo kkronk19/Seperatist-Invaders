@@ -1,7 +1,6 @@
 package spaceinvaders.core.systems;
 
 import java.util.List;
-
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.EnemyBullet;
 import spaceinvaders.core.entities.Invader;
@@ -35,7 +34,7 @@ public final class InvaderAttackSystem {
 
             try {
                 AudioManager.get().playSfx(
-                    "/spaceinvaders/resources/audio/sfx/wpn_cis_blaster_fire.wav",
+                    "/spaceinvaders/resources/audio/sfx/commando_droid_blaster_fire.wav",
                     0.25f
                 );
             } catch (Throwable ignored) {}

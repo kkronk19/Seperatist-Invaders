@@ -1,5 +1,5 @@
 package spaceinvaders.core.entities;
 
-public class Shooter {
+public class Player {
     // TODO: player properties
 }
