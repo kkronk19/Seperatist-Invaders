@@ -6,7 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 import spaceinvaders.core.entities.Blade;
 import spaceinvaders.core.entities.Bullet;
-import spaceinvaders.core.entities.EnemyBullet;   // <-- ADD THIS
+import spaceinvaders.core.entities.EnemyBullet;
 import spaceinvaders.core.entities.Invader;
 import spaceinvaders.core.entities.Missile;
 import spaceinvaders.services.audio.AudioManager;
@@ -24,6 +24,11 @@ public final class CollisionSystem {
     private static final String SFX_REFLECT_3 = "/spaceinvaders/resources/audio/sfx/reflect3.wav";
     private static final String SFX_SHIELD_DEPLETED = "/spaceinvaders/resources/audio/sfx/shield_depleted.wav";
 
+    // tank death sounds
+    private static final String SFX_TANK_DEATH_1 = "/spaceinvaders/resources/audio/sfx/tank_death1.wav";
+    private static final String SFX_TANK_DEATH_2 = "/spaceinvaders/resources/audio/sfx/tank_death2.wav";
+    private static final String SFX_TANK_DEATH_3 = "/spaceinvaders/resources/audio/sfx/tank_death3.wav";
+
     private static final double ROCKET_DEFLECT_CHANCE = 0.25;
 
     /** Bullet vs Invader collisions. Mutates lists safely. */
@@ -40,7 +45,7 @@ public final class CollisionSystem {
         for (Iterator<Bullet> bit = bullets.iterator(); bit.hasNext();) {
             Bullet b = bit.next();
 
-            // ✅ Enemy bullets should NEVER hit invaders (prevents shooter "suicide")
+            //enemy bullets should NEVER collide with invaders
             if (b instanceof EnemyBullet) {
                 continue;
             }
@@ -64,12 +69,27 @@ public final class CollisionSystem {
 
                 if (res == Invader.HitResult.KILLED) {
                     iit.remove();
-                    AudioManager.get().playRandomSfx(
-                        1.1f,
-                        "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
-                        "/spaceinvaders/resources/audio/sfx/CICOM408.wav",
-                        "/spaceinvaders/resources/audio/sfx/CICOM409.wav"
-                    );
+
+                    // tank death sfx
+                    if (inv.kind == Invader.InvaderKind.TANK) {
+                        try {
+                            AudioManager.get().playRandomSfx(
+                                    0.90f,
+                                    SFX_TANK_DEATH_1,
+                                    SFX_TANK_DEATH_2,
+                                    SFX_TANK_DEATH_3
+                            );
+                        } catch (Throwable ignored) {}
+                    } else {
+                        try {
+                            AudioManager.get().playRandomSfx(
+                                    1.1f,
+                                    "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
+                                    "/spaceinvaders/resources/audio/sfx/CICOM408.wav",
+                                    "/spaceinvaders/resources/audio/sfx/CICOM409.wav"
+                            );
+                        } catch (Throwable ignored) {}
+                    }
                 }
 
                 // --------------------------
@@ -111,7 +131,7 @@ public final class CollisionSystem {
 
                             b.vy = -1;
                             b.vx = (Math.random() < 0.5) ? -4 : 4;
-                            b.y = inv.y - b.size - 2;
+                            b.y  = inv.y - b.size - 2;
 
                             removeBullet = false;
                         } else {

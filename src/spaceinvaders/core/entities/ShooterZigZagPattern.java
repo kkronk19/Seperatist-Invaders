@@ -4,17 +4,17 @@ import java.util.Random;
 
 /**
  * Shooter zig-zag:
- * - Every 2 seconds chooses: left diag, straight down, right diag
- * - Boundary hit forces direction away and resets timer
- * - Shoots each time it chooses/forces a direction by setting inv.firePending = true
+ * - Every 2 seconds chooses: diag left, straight down, diag right
+ * - If it hits a side wall, it forces direction away and resets timer
+ * - On every decision/forced-change, it requests a shot via inv.firePending
  *
- * NOTE: This pattern is stateful; create a new instance per invader.
+ * NOTE: This pattern is stateful. Use a NEW instance per shooter invader.
  */
 public class ShooterZigZagPattern implements MovementPattern {
 
     private static final int DECIDE_MS = 2000;
 
-    // Half-speed (tank-like pacing)
+    // Shooter pacing (half speed “tank-like”). Tweak if needed.
     private static final int SPEED_Y = 1;
     private static final int SPEED_X = 1;
 
@@ -25,17 +25,19 @@ public class ShooterZigZagPattern implements MovementPattern {
 
     @Override
     public void update(Invader inv, long dtMs, int panelW, int panelH) {
+        // countdown
         decideTimerMs -= (int) dtMs;
 
+        // decide a new direction every DECIDE_MS
         if (decideTimerMs <= 0) {
             pickDirection(inv);
         }
 
-        // move
+        // move using inv.vx/vy
         inv.x += inv.vx;
         inv.y += inv.vy;
 
-        // boundary handling forces direction away for at least DECIDE_MS
+        // boundary handling (force away + reset timer so it moves away for >= 2s)
         if (inv.x <= 0) {
             inv.x = 0;
             forceDirection(inv, +1);
@@ -47,7 +49,7 @@ public class ShooterZigZagPattern implements MovementPattern {
 
     private void pickDirection(Invader inv) {
         int r = rng.nextInt(3); // 0 left, 1 down, 2 right
-        dir = (r == 0) ? -1 : (r == 1 ? 0 : 1);
+        dir = (r == 0) ? -1 : (r == 2 ? +1 : 0);
 
         apply(inv, dir);
 
@@ -59,17 +61,16 @@ public class ShooterZigZagPattern implements MovementPattern {
 
     private void forceDirection(Invader inv, int forcedDir) {
         dir = forcedDir;
-
         apply(inv, dir);
 
-        // request a shot on forced direction change too
+        // request a shot on forced change too
         inv.firePending = true;
 
         decideTimerMs = DECIDE_MS;
     }
 
-    private void apply(Invader inv, int dir) {
-        inv.vx = dir * SPEED_X;
+    private void apply(Invader inv, int d) {
         inv.vy = SPEED_Y;
+        inv.vx = d * SPEED_X;
     }
 }

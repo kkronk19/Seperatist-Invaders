@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+
 import spaceinvaders.core.GameState;
 import spaceinvaders.core.Scene;
 import spaceinvaders.core.SceneManager;
@@ -20,6 +21,7 @@ import spaceinvaders.core.systems.CollisionSystem;
 import spaceinvaders.core.systems.InvaderAttackSystem;
 import spaceinvaders.input.FireController;
 import spaceinvaders.services.audio.AudioManager;
+import spaceinvaders.services.loading.AssetLoader;
 import spaceinvaders.weapons.BlasterWeapon;
 import spaceinvaders.weapons.MissileWeapon;
 
@@ -77,6 +79,18 @@ public class SandboxScene implements Scene {
         state.playerX = state.width / 2 - state.playerWidth / 2;
 
         fire = new FireController(new BlasterWeapon(), new MissileWeapon());
+
+        // ---------- LOAD IMAGES ONCE ----------
+            try {
+        state.invaderImageBasic    = AssetLoader.imageFromResource("image/b1_droid.png");
+        state.invaderImageTank     = AssetLoader.imageFromResource("image/aat.png");
+        state.invaderImageShielded = AssetLoader.imageFromResource("image/droideka.png");
+        state.invaderImageShooter  = AssetLoader.imageFromResource("image/bx_commando_droid.png");
+        state.invaderImageSwarmer  = AssetLoader.imageFromResource("image/buzz_droid.png");
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+
 
         try { AudioManager.get().stopLoop("menu"); } catch (Throwable ignored) {}
     }
@@ -221,31 +235,23 @@ public class SandboxScene implements Scene {
             double roll = rng.nextDouble();
 
             if (roll < 0.22) {
-                // 22% BASIC
                 invaders.add(new Invader(x, -40, 40, 40, Invader.InvaderKind.BASIC, null));
 
             } else if (roll < 0.44) {
-                // 22% SHIELDED
                 invaders.add(new Invader(x, -40, 40, 40, Invader.InvaderKind.SHIELDED, null));
 
             } else if (roll < 0.62) {
-                // 18% SWARMER
                 invaders.add(new Invader(x, -40, 26, 26, Invader.InvaderKind.SWARMER, new SwarmerZigZagPattern()));
 
             } else if (roll < 0.82) {
-                // 20% SHOOTER (slow "hang back" zig-zag)
                 Invader s = new Invader(x, -40, 40, 40, Invader.InvaderKind.SHOOTER, new ShooterZigZagPattern());
-                s.hp = 1;              // same as basic
-                s.touchDamage = 1;     // same as basic
-                s.scoreValue = 10;     // same as basic
-
-                // keep it slow so it doesn't rush the bottom
+                s.hp = 1;
+                s.touchDamage = 1;
+                s.scoreValue = 10;
                 s.vy = 1;
-
                 invaders.add(s);
 
             } else {
-                // 18% TANK
                 Invader t = new Invader(x, -60, 56, 56, Invader.InvaderKind.TANK, null);
                 t.hp = 6;
                 t.vy = 1;
@@ -270,7 +276,7 @@ public class SandboxScene implements Scene {
             if (inv.y > state.height + 50) it.remove();
         }
 
-        // --- Shooter attacks (spawn enemy bullets) ---
+        // --- Shooter attacks ---
         InvaderAttackSystem.spawnShooterBullets(invaders, bullets);
 
         // --- Collisions ---
