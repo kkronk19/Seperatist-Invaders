@@ -8,6 +8,7 @@ public class Bullet {
     public int size;
     public int damage;
     public BulletKind kind;
+    public boolean explodesOnHit = false;
 
     public Bullet(int x, int y, int vx, int vy, int size, int damage, BulletKind kind) {
         this.x = x; this.y = y;
@@ -25,4 +26,6 @@ public class Bullet {
     public boolean isOffScreen(int w, int h) {
         return x < -size || x > w + size || y < -size || y > h + size;
     }
+
+    
 }

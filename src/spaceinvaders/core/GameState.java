@@ -1,10 +1,9 @@
 package spaceinvaders.core;
-import spaceinvaders.core.entities.Bullet;
 
 import java.awt.Image;
 import java.util.ArrayList;
 import java.util.List;
-
+import spaceinvaders.core.entities.Bullet;
 
 public class GameState {
 
@@ -15,7 +14,6 @@ public class GameState {
     public static final int VIRTUAL_W = 1920;
     public static final int VIRTUAL_H = 1080;
 
-    // Virtual world dimensions (do not change at runtime)
     public int width  = VIRTUAL_W;
     public int height = VIRTUAL_H;
 
@@ -25,14 +23,28 @@ public class GameState {
     public int playerHeight = 60;
     public Image playerImage;   // set by menus
 
-    // Invaders
+    // ------------------------------------------------------------------
+    // LEGACY MENU/DEMO INVADERS (StartMenuDemo + Painter still use these)
+    // ------------------------------------------------------------------
     public static final class Invader {
         public int x, y, size;
         public Invader(int x, int y, int size){ this.x=x; this.y=y; this.size=size; }
     }
     public final List<Invader> invaders = new ArrayList<>();
-    public Image invaderImage;   // set by menus
+    public Image invaderImage;   // legacy "one invader image" used by Painter/menu
 
+    // ------------------------------------------------------------------
+    // NEW: per-kind images (used by core.render.InvaderRenderer)
+    // ------------------------------------------------------------------
+    public Image invaderImageBasic;     // b1_droid.png
+    public Image invaderImageTank;      // aat.png
+    public Image invaderImageShielded;  // droideka.png
+    public Image invaderImageShooter;   // bx_commando_droid.png
+    public Image invaderImageSwarmer;   // buzz_droid.png
+
+    // ------------------------------------------------------------------
+    // bullets
+    // ------------------------------------------------------------------
     public final List<Bullet> bullets = new ArrayList<>();
 
     public enum BulletType { TRIANGLE, CIRCLE, SQUARE, IMAGE }
@@ -42,5 +54,4 @@ public class GameState {
     // Input flags
     public boolean moveLeft = false;
     public boolean moveRight = false;
-
 }

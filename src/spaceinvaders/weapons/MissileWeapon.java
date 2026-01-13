@@ -1,12 +1,12 @@
 package spaceinvaders.weapons;
 
+import java.util.*;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.Missile;
-import java.util.*;
 
 public class MissileWeapon implements Weapon {
     private final int cooldownMs = 500;
-    private final int vy = -10, size = 12, dmg = 2;
+    private final int vy = -10, size = 12, dmg = 6;
     private final double A = 36.0, W = 7.5;
     private final long maxLifeMs = 5000;
 
@@ -20,7 +20,6 @@ public class MissileWeapon implements Weapon {
         if (nowMs - lastShot < cooldownMs) return;
         lastShot = nowMs;
 
-        // 🔄 spawn an actual Missile (not a plain Bullet)
         Missile m = new Missile(mx - size/2, my, 0, vy, size, dmg);
         out.add(m);
         born.put(m, nowMs);
@@ -39,23 +38,56 @@ public class MissileWeapon implements Weapon {
             long age = nowMs - t0;
             if (age > maxLifeMs) { born.remove(m); x0.remove(m); continue; }
 
-            // snake path (absolute x)
-            double t = age / 1000.0;
-            double centerX = ox + A * Math.sin(W * t);
-            m.x = (int)Math.round(centerX - m.size / 2.0);
+            // snake path (absolute x) ONLY when not in straightFlight
+            if (!m.straightFlight) {
+                double t = age / 1000.0;
+                double centerX = ox + A * Math.sin(W * t);
+                m.x = (int)Math.round(centerX - m.size / 2.0);
+            }
 
-            // 🔸 trail: add a particle at the missile tail
-            int cx = m.x + m.size / 2;
-            int cy = m.y + m.size;           // slightly behind
+            // ------------------------------------------------------------
+            // Trail spawn at missile "tail" along velocity direction
+            // ------------------------------------------------------------
+            double vx = m.vx;
+            double vy = m.vy;
+            double len = Math.hypot(vx, vy);
+
+            // if velocity is degenerate, assume upward
+            double nx, ny;
+            if (len < 0.001) {
+                nx = 0.0;
+                ny = -1.0;
+            } else {
+                nx = vx / len;
+                ny = vy / len;
+            }
+
+            // center of missile
+            double cx = m.x + m.size / 2.0;
+            double cy = m.y + m.size / 2.0;
+
+            // tail point is opposite direction of travel
+            double tailDist = m.size * 0.55; // tweak for "behind the body"
+            int tx = (int)Math.round(cx - nx * tailDist);
+            int ty = (int)Math.round(cy - ny * tailDist);
+
             int r  = 2 + rng.nextInt(2);     // 2..3 px
-            m.trail.add(new Missile.Particle(cx, cy, r, 1.0f));
+            m.trail.add(new Missile.Particle(tx, ty, r, 1.0f));
 
-            // fade + drift particles
+            // fade + drift particles opposite the missile direction
+            // (small drift looks like exhaust; not always "down")
+            double drift = 0.9;
+            int driftX = (int)Math.round(-nx * drift);
+            int driftY = (int)Math.round(-ny * drift);
+
             for (Iterator<Missile.Particle> it = m.trail.iterator(); it.hasNext();) {
                 Missile.Particle p = it.next();
-                p.alpha *= 0.86f;   // fade
-                p.y += 1;           // small downward drift
-                if (p.alpha < 0.08f || m.trail.size() > 28) it.remove();
+                p.alpha *= 0.90f; // slower fade (longer trail)
+                p.x += driftX;
+                p.y += driftY;
+
+                // cap trail length a bit higher so it doesn't feel "too short"
+                if (p.alpha < 0.06f || m.trail.size() > 42) it.remove();
             }
         }
 

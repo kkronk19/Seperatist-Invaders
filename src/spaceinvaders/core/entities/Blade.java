@@ -1,10 +1,9 @@
 package spaceinvaders.core.entities;
 
-import spaceinvaders.services.audio.AudioManager;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import spaceinvaders.services.audio.AudioManager;
 
 public class Blade extends Bullet {
 
@@ -31,27 +30,40 @@ public class Blade extends Bullet {
     private final boolean legendarySplitEnabled;
     private boolean splitUsed = false;
 
+    /** If true, this blade ignores "armored" resistance rules. */
+    public final boolean armorPiercing;
+
     private final boolean verticalBounceEnabled;
 
     private int lifeMs = 0;
-    private final int maxLifeMs = 4500; // safety
+    private final int maxLifeMs = 9000; // safety
 
-    public Blade(int x, int y, int vx, int vy, int size,
-                 int bouncesRemaining,
-                 int pierceRemaining,
-                 boolean legendarySplitEnabled,
-                 boolean verticalBounceEnabled) {
-
+    public Blade(
+            int x, int y,
+            int vx, int vy,
+            int size,
+            int bouncesRemaining,
+            int pierceRemaining,
+            boolean legendarySplitEnabled,
+            boolean verticalBounceEnabled,
+            boolean armorPiercing
+    ) {
         super(x, y, vx, vy, size, 1, BulletKind.BLADE);
         this.bouncesRemaining = bouncesRemaining;
         this.pierceRemaining = pierceRemaining;
         this.legendarySplitEnabled = legendarySplitEnabled;
         this.verticalBounceEnabled = verticalBounceEnabled;
+        this.armorPiercing = armorPiercing;
+    }
+
+    /** Consume all remaining pierce (used when armor stops the blade). */
+    public void consumeAllPierce() {
+        this.pierceRemaining = 0;
     }
 
     /**
      * Update movement + bounces.
-     * Returns any spawned blades (legendary split) as plain Bullets so the caller can add safely.
+     * Returns any spawned blades (legendary split) as Bullets so caller can add safely.
      */
     public List<Bullet> updateBlade(int dtMs, int worldW, int worldH) {
         lifeMs += dtMs;
@@ -101,14 +113,14 @@ public class Blade extends Bullet {
                 bounceSfxCdMs = 90;
                 try {
                     AudioManager.get().playRandomSfx(
-                    0.20f,
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_02.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_03.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_04.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_06.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_08.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_12.wav"
-                );
+                        0.20f,
+                        "/spaceinvaders/resources/audio/sfx/imp_ricco_02.wav",
+                        "/spaceinvaders/resources/audio/sfx/imp_ricco_03.wav",
+                        "/spaceinvaders/resources/audio/sfx/imp_ricco_04.wav",
+                        "/spaceinvaders/resources/audio/sfx/imp_ricco_06.wav",
+                        "/spaceinvaders/resources/audio/sfx/imp_ricco_08.wav",
+                        "/spaceinvaders/resources/audio/sfx/imp_ricco_12.wav"
+                    );
                 } catch (Throwable ignored) {}
             }
 
@@ -120,23 +132,25 @@ public class Blade extends Bullet {
                 int childSpeedX = Math.max(2, Math.abs(this.vx) + 2);
 
                 spawned.add(new Blade(
-                        this.x, this.y,
-                        -childSpeedX, childVY,
-                        this.size,
-                        Math.max(0, bouncesRemaining - 1),
-                        Math.max(1, pierceRemaining - 1),
-                        false, // no recursion
-                        verticalBounceEnabled
+                    this.x, this.y,
+                    -childSpeedX, childVY,
+                    this.size,
+                    Math.max(0, bouncesRemaining - 1),
+                    Math.max(1, pierceRemaining - 1),
+                    false, // no recursion
+                    verticalBounceEnabled,
+                    this.armorPiercing
                 ));
 
                 spawned.add(new Blade(
-                        this.x, this.y,
-                        +childSpeedX, childVY,
-                        this.size,
-                        Math.max(0, bouncesRemaining - 1),
-                        Math.max(1, pierceRemaining - 1),
-                        false,
-                        verticalBounceEnabled
+                    this.x, this.y,
+                    +childSpeedX, childVY,
+                    this.size,
+                    Math.max(0, bouncesRemaining - 1),
+                    Math.max(1, pierceRemaining - 1),
+                    false,
+                    verticalBounceEnabled,
+                    this.armorPiercing
                 ));
             }
         }
@@ -158,15 +172,15 @@ public class Blade extends Bullet {
                 if (bounceSfxCdMs <= 0) {
                     bounceSfxCdMs = 90;
                     try {
-                       AudioManager.get().playRandomSfx(
-                    0.20f,
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_02.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_03.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_04.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_06.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_08.wav",
-                    "/spaceinvaders/resources/audio/sfx/imp_ricco_12.wav"
-                );
+                        AudioManager.get().playRandomSfx(
+                            0.20f,
+                            "/spaceinvaders/resources/audio/sfx/imp_ricco_02.wav",
+                            "/spaceinvaders/resources/audio/sfx/imp_ricco_03.wav",
+                            "/spaceinvaders/resources/audio/sfx/imp_ricco_04.wav",
+                            "/spaceinvaders/resources/audio/sfx/imp_ricco_06.wav",
+                            "/spaceinvaders/resources/audio/sfx/imp_ricco_08.wav",
+                            "/spaceinvaders/resources/audio/sfx/imp_ricco_12.wav"
+                        );
                     } catch (Throwable ignored) {}
                 }
             }
@@ -178,7 +192,7 @@ public class Blade extends Bullet {
         return spawned;
     }
 
-    /** Call when blade kills an invader. Returns true if it should despawn now. */
+    /** Call when blade hits an invader. Returns true if it should despawn now. */
     public boolean onHitInvader() {
         pierceRemaining--;
         return pierceRemaining <= 0;

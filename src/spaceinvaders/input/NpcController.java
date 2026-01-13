@@ -1,11 +1,10 @@
 package spaceinvaders.input;
 
+import java.util.List;
+import java.util.Random;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.Bullet.BulletKind;
 import spaceinvaders.services.audio.AudioManager;
-
-import java.util.List;
-import java.util.Random;
 
 /** Controls ONE title-screen clone. Spawn two instances for two clones. */
 public final class NpcController {
@@ -69,7 +68,7 @@ public final class NpcController {
             outBullets.add(new Bullet(x + playerW / 2, floorY, 0, -10, 6, 1, BulletKind.BASIC));
 
             try {
-                AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_cis_blaster_fire.wav", 0.12f);
+                AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/ct_blaster_fire.wav", 0.12f);
             } catch (Throwable ignored) {}
 
             fireMs = 0;
