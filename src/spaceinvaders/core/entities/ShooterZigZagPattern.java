@@ -4,62 +4,71 @@ import java.util.Random;
 
 /**
  * Shooter zig-zag:
- * - Same movement logic as Swarmer
- * - Shoots every time direction is chosen
- * - Slower movement so it stays back and pressures player
+ * - Every 2 seconds chooses: left diag, straight down, right diag
+ * - Boundary hit forces direction away and resets timer
+ * - Shoots each time it chooses/forces a direction by setting inv.firePending = true
+ *
+ * NOTE: This pattern is stateful; create a new instance per invader.
  */
 public class ShooterZigZagPattern implements MovementPattern {
 
     private static final int DECIDE_MS = 2000;
 
-    // 🔻 Slower than swarmer (tank-like pacing)
-    private static final int SPEED_Y = 1; // was 2
-    private static final int SPEED_X = 1; // was 2
+    // Half-speed (tank-like pacing)
+    private static final int SPEED_Y = 1;
+    private static final int SPEED_X = 1;
 
     private final Random rng = new Random();
 
+    private int decideTimerMs = 0;
+    private int dir = 0; // -1 left, 0 down, +1 right
+
     @Override
     public void update(Invader inv, long dtMs, int panelW, int panelH) {
-        if (inv.shootTimerMs <= 0) {
-            pickDirAndShoot(inv);
-        } else {
-            inv.shootTimerMs -= (int) dtMs;
-            if (inv.shootTimerMs <= 0) {
-                pickDirAndShoot(inv);
-            }
+        decideTimerMs -= (int) dtMs;
+
+        if (decideTimerMs <= 0) {
+            pickDirection(inv);
         }
 
+        // move
         inv.x += inv.vx;
         inv.y += inv.vy;
 
-        // Boundary handling
+        // boundary handling forces direction away for at least DECIDE_MS
         if (inv.x <= 0) {
             inv.x = 0;
-            forceDir(inv, +1);
+            forceDirection(inv, +1);
         } else if (inv.x + inv.width >= panelW) {
             inv.x = panelW - inv.width;
-            forceDir(inv, -1);
+            forceDirection(inv, -1);
         }
     }
 
-    private void pickDirAndShoot(Invader inv) {
-        int r = rng.nextInt(3); // left, down, right
-        int dir = (r == 0) ? -1 : (r == 1 ? 0 : 1);
-        applyDir(inv, dir);
+    private void pickDirection(Invader inv) {
+        int r = rng.nextInt(3); // 0 left, 1 down, 2 right
+        dir = (r == 0) ? -1 : (r == 1 ? 0 : 1);
 
-        // 🔫 mark that this invader should shoot
-        inv.requestShoot = true;
+        apply(inv, dir);
 
-        inv.shootTimerMs = DECIDE_MS;
+        // request a shot on every decision
+        inv.firePending = true;
+
+        decideTimerMs = DECIDE_MS;
     }
 
-    private void forceDir(Invader inv, int dir) {
-        applyDir(inv, dir);
-        inv.requestShoot = true;
-        inv.shootTimerMs = DECIDE_MS;
+    private void forceDirection(Invader inv, int forcedDir) {
+        dir = forcedDir;
+
+        apply(inv, dir);
+
+        // request a shot on forced direction change too
+        inv.firePending = true;
+
+        decideTimerMs = DECIDE_MS;
     }
 
-    private void applyDir(Invader inv, int dir) {
+    private void apply(Invader inv, int dir) {
         inv.vx = dir * SPEED_X;
         inv.vy = SPEED_Y;
     }
