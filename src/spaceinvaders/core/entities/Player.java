@@ -72,7 +72,7 @@ public class Player {
         }
     }
 
-    /* -------------------- Upgrade state (your exact list) -------------------- */
+    /* -------------------- Upgrade state -------------------- */
 
     // -------- Missile (basic) --------
     public boolean upMissileStraight = false;   // 1

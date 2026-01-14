@@ -1,12 +1,13 @@
 package spaceinvaders.ui.menu;
 
-import javax.swing.*;
 import java.awt.*;
+import javax.swing.*;
 import spaceinvaders.core.GameState;
-import spaceinvaders.ui.view.GamePanel;
 import spaceinvaders.core.SceneManager;
+import spaceinvaders.features.Mission1Scene;
 import spaceinvaders.features.SandboxScene;
 import spaceinvaders.services.audio.AudioManager;
+import spaceinvaders.ui.view.GamePanel;
 
 public class StartMenuPanel extends JPanel {
 
@@ -40,10 +41,11 @@ public class StartMenuPanel extends JPanel {
         // --- Actions ---
         play.addActionListener(e -> {
             try { AudioManager.get().stopLoop("menu"); } catch (Throwable ignored) {}
-            state.mode = GameState.AppMode.PLAY;
+            scenes.set(new Mission1Scene(state, scenes));
             setVisible(false);
             panel.requestFocusInWindow();
         });
+
 
         sandbox.addActionListener(e -> {
             scenes.set(new SandboxScene(state, scenes));

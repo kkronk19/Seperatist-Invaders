@@ -51,6 +51,14 @@ public final class CollisionSystem {
     private static final String SFX_SHOOTER_DEATH_3 = "/spaceinvaders/resources/audio/sfx/commando_droid_death3.wav";
     private static final String SFX_SHOOTER_DEATH_4 = "/spaceinvaders/resources/audio/sfx/commando_droid_death4.wav";
 
+    // basic death sounds
+    private static final String SFX_BASIC_DEATH_1 = "/spaceinvaders/resources/audio/sfx/drd_droid_hit_01.wav";
+    private static final String SFX_BASIC_DEATH_2 = "/spaceinvaders/resources/audio/sfx/drd_droid_hit_02.wav";
+    private static final String SFX_BASIC_DEATH_3 = "/spaceinvaders/resources/audio/sfx/drd_droid_hit_03.wav";
+    private static final String SFX_BASIC_DEATH_4 = "/spaceinvaders/resources/audio/sfx/drd_droid_hit_04.wav";
+    private static final String SFX_BASIC_DEATH_5 = "/spaceinvaders/resources/audio/sfx/drd_droid_hit_05.wav";
+    private static final String SFX_BASIC_DEATH_6 = "/spaceinvaders/resources/audio/sfx/drd_droid_hit_06.wav";
+
     private static final double ROCKET_DEFLECT_CHANCE = 0.25;
 
     /** Bullet vs Invader collisions. Mutates lists safely. */
