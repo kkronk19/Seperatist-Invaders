@@ -3,27 +3,62 @@ package spaceinvaders.weapons;
 import java.util.*;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.Missile;
+import spaceinvaders.core.entities.Player;
 
 public class MissileWeapon implements Weapon {
-    private final int cooldownMs = 500;
-    private final int vy = -10, size = 12, dmg = 6;
+
+    private final Player player;
+
+    // base stats
+    private final int baseCooldownMs = 500;
+    private final int vy = -10, size = 12, baseDmg = 2;
+
+    // snake path params (used when NOT straight)
     private final double A = 36.0, W = 7.5;
+
     private final long maxLifeMs = 5000;
 
     private long lastShot = 0L;
-    private final Map<Bullet, Long>    born = new HashMap<>();
-    private final Map<Bullet, Integer> x0   = new HashMap<>();
+    private final Map<Bullet, Long> born = new HashMap<>();
+    private final Map<Bullet, Integer> x0 = new HashMap<>();
     private final Random rng = new Random();
+
+    public MissileWeapon(Player player) {
+        this.player = player;
+    }
 
     @Override
     public void tryFire(long nowMs, int mx, int my, boolean isHeld, List<Bullet> out) {
-        if (nowMs - lastShot < cooldownMs) return;
+        int cd = effectiveCooldownMs();
+        if (nowMs - lastShot < cd) return;
         lastShot = nowMs;
 
-        Missile m = new Missile(mx - size/2, my, 0, vy, size, dmg);
-        out.add(m);
-        born.put(m, nowMs);
-        x0.put(m, mx);
+        int count = player.missileCount(); // 1..3 by your design
+        int dmg = player.missileDamage(baseDmg);
+
+        // spacing so 2/3 missiles don't overlap
+        int spacing = 16;
+
+        int startOffset = 0;
+        if (count == 2) startOffset = -spacing/2;
+        if (count == 3) startOffset = -spacing;
+
+        for (int i = 0; i < count; i++) {
+            int ox = startOffset + i * spacing;
+
+            Missile m = new Missile(mx - size/2 + ox, my, 0, vy, size, dmg);
+            // if straight upgrade is enabled, disable snake behavior
+            m.straightFlight = player.upMissileStraight;
+
+            out.add(m);
+            born.put(m, nowMs);
+            x0.put(m, mx + ox);
+        }
+    }
+
+    private int effectiveCooldownMs() {
+        double mult = player.missileFireRateMult();
+        return (int)Math.max(120, Math.round(baseCooldownMs / mult));
     }
 
     @Override
@@ -38,57 +73,27 @@ public class MissileWeapon implements Weapon {
             long age = nowMs - t0;
             if (age > maxLifeMs) { born.remove(m); x0.remove(m); continue; }
 
-            // snake path (absolute x) ONLY when not in straightFlight
+            // snake path only if not straightFlight
             if (!m.straightFlight) {
                 double t = age / 1000.0;
                 double centerX = ox + A * Math.sin(W * t);
                 m.x = (int)Math.round(centerX - m.size / 2.0);
             }
 
-            // ------------------------------------------------------------
-            // Trail spawn at missile "tail" along velocity direction
-            // ------------------------------------------------------------
-            double vx = m.vx;
-            double vy = m.vy;
-            double len = Math.hypot(vx, vy);
-
-            // if velocity is degenerate, assume upward
-            double nx, ny;
-            if (len < 0.001) {
-                nx = 0.0;
-                ny = -1.0;
-            } else {
-                nx = vx / len;
-                ny = vy / len;
-            }
-
-            // center of missile
-            double cx = m.x + m.size / 2.0;
-            double cy = m.y + m.size / 2.0;
-
-            // tail point is opposite direction of travel
-            double tailDist = m.size * 0.55; // tweak for "behind the body"
-            int tx = (int)Math.round(cx - nx * tailDist);
-            int ty = (int)Math.round(cy - ny * tailDist);
-
+            // trail particle at missile tail (centered)
+            int cx = m.x + m.size / 2;
+            int cy = m.y + m.size;           // tail
             int r  = 2 + rng.nextInt(2);     // 2..3 px
-            m.trail.add(new Missile.Particle(tx, ty, r, 1.0f));
+            m.trail.add(new Missile.Particle(cx, cy, r, 1.0f));
 
-            // fade + drift particles opposite the missile direction
-            // (small drift looks like exhaust; not always "down")
-            double drift = 0.9;
-            int driftX = (int)Math.round(-nx * drift);
-            int driftY = (int)Math.round(-ny * drift);
-
+            // fade + cap
             for (Iterator<Missile.Particle> it = m.trail.iterator(); it.hasNext();) {
                 Missile.Particle p = it.next();
-                p.alpha *= 0.90f; // slower fade (longer trail)
-                p.x += driftX;
-                p.y += driftY;
-
-                // cap trail length a bit higher so it doesn't feel "too short"
-                if (p.alpha < 0.06f || m.trail.size() > 42) it.remove();
+                p.alpha *= 0.86f;
+                p.y += 1;
+                if (p.alpha < 0.06f) it.remove();
             }
+            while (m.trail.size() > 40) m.trail.remove(0);
         }
 
         born.keySet().removeIf(b -> !bullets.contains(b));

@@ -4,6 +4,8 @@ import java.awt.Image;
 import java.util.ArrayList;
 import java.util.List;
 import spaceinvaders.core.entities.Bullet;
+import spaceinvaders.core.entities.Player;
+
 
 public class GameState {
 
@@ -18,6 +20,7 @@ public class GameState {
     public int height = VIRTUAL_H;
 
     // player
+    public final Player player = new Player();
     public int playerX = 200;
     public int playerWidth = 50;
     public int playerHeight = 60;

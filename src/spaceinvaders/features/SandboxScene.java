@@ -14,6 +14,7 @@ import spaceinvaders.core.SceneManager;
 import spaceinvaders.core.entities.Blade;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.Invader;
+import spaceinvaders.core.entities.Player;
 import spaceinvaders.core.entities.ShooterZigZagPattern;
 import spaceinvaders.core.entities.SwarmerZigZagPattern;
 import spaceinvaders.core.systems.CollisionSystem;
@@ -30,6 +31,7 @@ public class SandboxScene implements Scene {
     private final GameState state;
     private final SceneManager scenes;
     private final Random rng = new Random();
+    private Player player;
 
     private FireController fire;
 
@@ -38,6 +40,14 @@ public class SandboxScene implements Scene {
 
     private boolean moveLeft, moveRight;
     private long nextSpawnMs = 0;
+
+    private static final String IMG_BASIC    = "image/b1_droid.png";
+    private static final String IMG_TANK     = "image/aat.png";
+    private static final String IMG_SHIELDED = "image/droideka.png";
+    private static final String IMG_SHOOTER  = "image/bx_commando_droid.png";
+    private static final String IMG_SWARMER  = "image/buzz_droid.png";
+
+    private boolean assetsLoaded = false;
 
     private List<Bullet> spawnShrapnel(int cx, int cy) {
         final int shards = 5;
@@ -53,7 +63,10 @@ public class SandboxScene implements Scene {
             out.add(new Bullet(cx, cy, vx, vy, size, dmg, Bullet.BulletKind.BASIC));
         }
 
-        AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/exp_ord_rocket_small01.wav", 0.66f);
+        try {
+            AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/exp_ord_rocket_small01.wav", 0.66f);
+        } catch (Throwable ignored) {}
+
         return out;
     }
 
@@ -63,6 +76,7 @@ public class SandboxScene implements Scene {
     private static final int BLADE_PIERCE  = 3;
     private static final int BLADE_BOUNCES = 3;
 
+    // for now these are off in sandbox (you’ll wire to Player upgrades later)
     private boolean bladeVerticalBounce = false;
     private boolean bladeLegendarySplit = false;
 
@@ -77,21 +91,33 @@ public class SandboxScene implements Scene {
         state.mode = GameState.AppMode.SANDBOX;
         state.playerX = state.width / 2 - state.playerWidth / 2;
 
-        fire = new FireController(new BlasterWeapon(), new MissileWeapon());
+        // keep your current weapons (no Player wiring yet)
+        player = new Player(); // defaults for now
+        fire = new FireController(
+                new BlasterWeapon(),
+                new MissileWeapon(player)
+        );
+
 
         // ---------- LOAD IMAGES ONCE ----------
-            try {
-        state.invaderImageBasic    = AssetLoader.imageFromResource("image/b1_droid.png");
-        state.invaderImageTank     = AssetLoader.imageFromResource("image/aat.png");
-        state.invaderImageShielded = AssetLoader.imageFromResource("image/droideka.png");
-        state.invaderImageShooter  = AssetLoader.imageFromResource("image/bx_commando_droid.png");
-        state.invaderImageSwarmer  = AssetLoader.imageFromResource("image/buzz_droid.png");
-    } catch (Exception e) {
-        e.printStackTrace();
-    }
-
+        loadInvaderImagesOnce();
 
         try { AudioManager.get().stopLoop("menu"); } catch (Throwable ignored) {}
+    }
+
+    private void loadInvaderImagesOnce() {
+        if (assetsLoaded) return;
+        assetsLoaded = true;
+
+        try {
+            state.invaderImageBasic    = AssetLoader.imageFromResource(IMG_BASIC);
+            state.invaderImageTank     = AssetLoader.imageFromResource(IMG_TANK);
+            state.invaderImageShielded = AssetLoader.imageFromResource(IMG_SHIELDED);
+            state.invaderImageShooter  = AssetLoader.imageFromResource(IMG_SHOOTER);
+            state.invaderImageSwarmer  = AssetLoader.imageFromResource(IMG_SWARMER);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -146,6 +172,8 @@ public class SandboxScene implements Scene {
         int vy = -4;
         int size = 10;
 
+        // NOTE: your Blade constructor currently has 9 params in your version:
+        // (x,y,vx,vy,size,bounces,pierce,legendarySplit,verticalBounce,armorPiercing)
         bullets.add(new Blade(
             muzzleX, muzzleY,
             -vx, vy,
@@ -232,7 +260,6 @@ public class SandboxScene implements Scene {
         // --- Invader spawning ---
         if (now > nextSpawnMs) {
             int x = rng.nextInt(Math.max(1, state.width - 60));
-
             double roll = rng.nextDouble();
 
             if (roll < 0.22) {
@@ -249,7 +276,7 @@ public class SandboxScene implements Scene {
                 s.hp = 1;
                 s.touchDamage = 1;
                 s.scoreValue = 10;
-                s.vy = 1;
+                s.vy = 1; // slow hang-back
                 invaders.add(s);
 
             } else {
@@ -258,6 +285,7 @@ public class SandboxScene implements Scene {
                 t.vy = 1;
                 t.scoreValue = 40;
                 t.touchDamage = 2;
+                t.armored = true; // IMPORTANT for your blade armor logic
                 invaders.add(t);
             }
 
@@ -304,6 +332,7 @@ public class SandboxScene implements Scene {
         Image playerImg = state.playerImage;
         int px = state.playerX;
         int py = height - state.playerHeight - 10;
+
         if (playerImg != null) {
             g.drawImage(playerImg, px, py, state.playerWidth, state.playerHeight, null);
         } else {
