@@ -29,25 +29,27 @@ public class MissileWeapon implements Weapon {
 
     @Override
     public void tryFire(long nowMs, int mx, int my, boolean isHeld, List<Bullet> out) {
+        // This weapon is intended to be "tap fired" via FireController secondary.
         int cd = effectiveCooldownMs();
         if (nowMs - lastShot < cd) return;
         lastShot = nowMs;
 
-        int count = player.missileCount(); // 1..3 by your design
-        int dmg = player.missileDamage(baseDmg);
+        int count = player.missileCount(); // 1..3
+        int dmg   = player.missileDamage(baseDmg);
 
         // spacing so 2/3 missiles don't overlap
         int spacing = 16;
 
         int startOffset = 0;
-        if (count == 2) startOffset = -spacing/2;
+        if (count == 2) startOffset = -spacing / 2;
         if (count == 3) startOffset = -spacing;
 
         for (int i = 0; i < count; i++) {
             int ox = startOffset + i * spacing;
 
-            Missile m = new Missile(mx - size/2 + ox, my, 0, vy, size, dmg);
-            // if straight upgrade is enabled, disable snake behavior
+            Missile m = new Missile(mx - size / 2 + ox, my, 0, vy, size, dmg);
+
+            // straight upgrade: disable snake behavior
             m.straightFlight = player.upMissileStraight;
 
             out.add(m);
@@ -58,7 +60,7 @@ public class MissileWeapon implements Weapon {
 
     private int effectiveCooldownMs() {
         double mult = player.missileFireRateMult();
-        return (int)Math.max(120, Math.round(baseCooldownMs / mult));
+        return (int) Math.max(120, Math.round(baseCooldownMs / mult));
     }
 
     @Override
@@ -71,19 +73,23 @@ public class MissileWeapon implements Weapon {
             if (t0 == null || ox == null) continue;
 
             long age = nowMs - t0;
-            if (age > maxLifeMs) { born.remove(m); x0.remove(m); continue; }
+            if (age > maxLifeMs) {
+                born.remove(m);
+                x0.remove(m);
+                continue;
+            }
 
             // snake path only if not straightFlight
             if (!m.straightFlight) {
                 double t = age / 1000.0;
                 double centerX = ox + A * Math.sin(W * t);
-                m.x = (int)Math.round(centerX - m.size / 2.0);
+                m.x = (int) Math.round(centerX - m.size / 2.0);
             }
 
             // trail particle at missile tail (centered)
             int cx = m.x + m.size / 2;
-            int cy = m.y + m.size;           // tail
-            int r  = 2 + rng.nextInt(2);     // 2..3 px
+            int cy = m.y + m.size;        // tail
+            int r  = 2 + rng.nextInt(2);  // 2..3 px
             m.trail.add(new Missile.Particle(cx, cy, r, 1.0f));
 
             // fade + cap
@@ -96,6 +102,7 @@ public class MissileWeapon implements Weapon {
             while (m.trail.size() > 40) m.trail.remove(0);
         }
 
+        // cleanup maps for deleted missiles
         born.keySet().removeIf(b -> !bullets.contains(b));
         x0.keySet().removeIf(b -> !bullets.contains(b));
     }

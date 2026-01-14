@@ -32,7 +32,7 @@ public final class NpcController {
         this.dirNextMs  = 1000 + rng.nextInt(5001); // 1000–6000
         this.fireNextMs = 180  + rng.nextInt(181);  // 180–360
 
-        // BIG: desync at spawn so they don’t match up
+        // desync at spawn
         this.dirMs  = rng.nextInt(dirNextMs);
         this.fireMs = rng.nextInt(fireNextMs);
     }
@@ -40,14 +40,14 @@ public final class NpcController {
     /**
      * Call every frame while in START_MENU.
      *
-     * @param frameMs  delta time (your FRAME_TIME)
-     * @param worldW   virtual width
-     * @param playerW  clone sprite width
-     * @param floorY   y where clone stands / bullet starts
+     * @param frameMs    delta time (your FRAME_TIME)
+     * @param worldW     virtual width
+     * @param playerW    clone sprite width
+     * @param floorY     y where clone stands
      * @param outBullets list to append bullets into
      */
     public void tick(int frameMs, int worldW, int playerW, int floorY, List<Bullet> outBullets) {
-        // Change direction every 1–6s (independent per clone)
+        // Change direction every 1–6s
         dirMs += frameMs;
         if (dirMs >= dirNextMs) {
             dx = rng.nextBoolean() ? 1 : -1;
@@ -55,17 +55,31 @@ public final class NpcController {
             dirNextMs = 1000 + rng.nextInt(5001);
         }
 
-        // Move + bounce on walls (smooth like your old demo)
+        // Move + bounce on walls
         int maxX = Math.max(0, worldW - playerW);
         x += dx * speed;
 
         if (x <= 0) { x = 0; dx = 1; }
         else if (x >= maxX) { x = maxX; dx = -1; }
 
-        // Fire every ~180–360ms (independent per clone)
+        // Fire every ~180–360ms
         fireMs += frameMs;
         if (fireMs >= fireNextMs) {
-            outBullets.add(new Bullet(x + playerW / 2, floorY, 0, -10, 6, 1, BulletKind.BASIC));
+            final int size = 8;
+
+            int muzzleCenterX = x + playerW / 2;
+            int muzzleY = floorY - 12; // slightly above the feet/ground line
+
+            // IMPORTANT: Bullet uses TOP-LEFT coordinates
+            outBullets.add(new Bullet(
+                    muzzleCenterX - size / 2,
+                    muzzleY,
+                    0,
+                    -10,
+                    size,
+                    1,
+                    BulletKind.BASIC
+            ));
 
             try {
                 AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/ct_blaster_fire.wav", 0.12f);

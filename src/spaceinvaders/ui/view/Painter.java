@@ -1,10 +1,9 @@
 package spaceinvaders.ui.view;
 
-import spaceinvaders.core.GameState;
-import spaceinvaders.core.entities.Bullet;
-
 import java.awt.*;
 import java.util.List;
+import spaceinvaders.core.GameState;
+import spaceinvaders.core.entities.Bullet;
 
 public class Painter {
 
@@ -20,15 +19,13 @@ public class Painter {
     private void drawPlayer(Graphics g, GameState s, Component observer) {
         if (s.playerImage == null) return;
         int y = s.height - s.playerHeight;
-        g.drawImage(s.playerImage, s.playerX, y,
-                s.playerWidth, s.playerHeight, observer);
+        g.drawImage(s.playerImage, s.playerX, y, s.playerWidth, s.playerHeight, observer);
     }
 
     private void drawInvaders(Graphics g, GameState s, Component observer) {
         if (s.invaderImage == null) return;
         for (GameState.Invader inv : s.invaders) {
-            g.drawImage(s.invaderImage, inv.x, inv.y,
-                    inv.size, inv.size, observer);
+            g.drawImage(s.invaderImage, inv.x, inv.y, inv.size, inv.size, observer);
         }
     }
 
@@ -39,32 +36,46 @@ public class Painter {
             case TRIANGLE -> {
                 g.setColor(Color.YELLOW);
                 for (Bullet b : bullets) {
-                    int[] xs = { b.x, b.x - 5, b.x + 5 };
-                    int[] ys = { b.y, b.y + 10, b.y + 10 };
+                    int ssz = Math.max(6, b.size);
+                    int half = ssz / 2;
+
+                    int[] xs = { b.x, b.x - half, b.x + half };
+                    int[] ys = { b.y, b.y + ssz, b.y + ssz };
                     g.fillPolygon(xs, ys, 3);
                 }
             }
             case CIRCLE -> {
                 g.setColor(Color.CYAN);
-                for (Bullet b : bullets)
-                    g.fillOval(b.x - 5, b.y - 5, 10, 10);
+                for (Bullet b : bullets) {
+                    int ssz = Math.max(6, b.size);
+                    int half = ssz / 2;
+                    g.fillOval(b.x - half, b.y - half, ssz, ssz);
+                }
             }
             case SQUARE -> {
                 g.setColor(Color.MAGENTA);
-                for (Bullet b : bullets)
-                    g.fillRect(b.x - 5, b.y - 5, 10, 10);
+                for (Bullet b : bullets) {
+                    int ssz = Math.max(6, b.size);
+                    int half = ssz / 2;
+                    g.fillRect(b.x - half, b.y - half, ssz, ssz);
+                }
             }
             case IMAGE -> {
                 if (s.bulletImage == null) {
                     g.setColor(Color.YELLOW);
                     for (Bullet b : bullets) {
-                        int[] xs = { b.x, b.x - 5, b.x + 5 };
-                        int[] ys = { b.y, b.y + 10, b.y + 10 };
+                        int ssz = Math.max(6, b.size);
+                        int half = ssz / 2;
+                        int[] xs = { b.x, b.x - half, b.x + half };
+                        int[] ys = { b.y, b.y + ssz, b.y + ssz };
                         g.fillPolygon(xs, ys, 3);
                     }
                 } else {
-                    for (Bullet b : bullets)
-                        g.drawImage(s.bulletImage, b.x - 6, b.y - 6, 12, 12, observer);
+                    for (Bullet b : bullets) {
+                        int ssz = Math.max(6, b.size);
+                        int half = ssz / 2;
+                        g.drawImage(s.bulletImage, b.x - half, b.y - half, ssz, ssz, observer);
+                    }
                 }
             }
         }

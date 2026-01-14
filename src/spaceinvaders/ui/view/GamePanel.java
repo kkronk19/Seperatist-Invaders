@@ -1,17 +1,16 @@
 package spaceinvaders.ui.view;
 
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.locks.LockSupport;
+import javax.swing.*;
 import spaceinvaders.core.GameState;
 import spaceinvaders.core.SceneManager;
 import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.features.StartMenuDemo;
 import spaceinvaders.input.KeyInput;
 import spaceinvaders.input.NpcController;
-
-import javax.swing.*;
-import java.awt.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.locks.LockSupport;
 
 public class GamePanel extends JPanel implements Runnable {
 
@@ -30,7 +29,7 @@ public class GamePanel extends JPanel implements Runnable {
     private final double leftFrac = 0.05;
     private final double rightFrac = 0.90;
 
-    // Title clones (two independent controllers) + title bullets (use existing Bullet class)
+    // Title clones (two independent controllers) + title bullets
     private final List<NpcController> titleClones = new ArrayList<>();
     private final List<Bullet> titleBullets = new ArrayList<>();
 
@@ -251,16 +250,16 @@ public class GamePanel extends JPanel implements Runnable {
             }
         }
 
-        // bullets from titleBullets (existing Bullet class)
+        // bullets from titleBullets (Bullet uses TOP-LEFT coords now)
         Image bulletImg = demo.bulletImage();
         for (Bullet b : titleBullets) {
+            int s = Math.max(6, b.size);
+
             if (bulletImg != null) {
-                g.drawImage(bulletImg, b.x - 6, b.y - 6, 12, 12, this);
+                g.drawImage(bulletImg, b.x, b.y, s, s, this);
             } else {
                 g.setColor(Color.YELLOW);
-                int[] xs = { b.x, b.x - 5, b.x + 5 };
-                int[] ys = { b.y, b.y + 10, b.y + 10 };
-                g.fillPolygon(xs, ys, 3);
+                g.fillRect(b.x, b.y, s, s);
             }
         }
     }

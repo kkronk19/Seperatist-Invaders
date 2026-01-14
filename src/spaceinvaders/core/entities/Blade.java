@@ -33,10 +33,11 @@ public class Blade extends Bullet {
     /** If true, this blade ignores "armored" resistance rules. */
     public final boolean armorPiercing;
 
+    /** If true, blade can bounce off top/bottom instead of dying. */
     private final boolean verticalBounceEnabled;
 
     private int lifeMs = 0;
-    private final int maxLifeMs = 9000; // safety
+    private static final int MAX_LIFE_MS = 9000; // safety
 
     public Blade(
             int x, int y,
@@ -74,6 +75,7 @@ public class Blade extends Bullet {
 
         // --- ghost trail: record BEFORE move so ghosts lag behind ---
         trail.add(new Ghost(this.x, this.y, 0.45f)); // start alpha
+
         // fade + cap
         for (Iterator<Ghost> it = trail.iterator(); it.hasNext();) {
             Ghost g = it.next();
@@ -100,7 +102,7 @@ public class Blade extends Bullet {
             // reflect X
             this.vx = -this.vx;
 
-            // OPTIONAL: widen rebound slightly (makes it feel less “straight up”)
+            // widen rebound slightly
             this.vx += (this.vx > 0 ? 1 : -1);
 
             bouncesRemaining--;
@@ -109,20 +111,7 @@ public class Blade extends Bullet {
             flashMs = 110;
 
             // bounce sound (gated)
-            if (bounceSfxCdMs <= 0) {
-                bounceSfxCdMs = 90;
-                try {
-                    AudioManager.get().playRandomSfx(
-                        0.20f,
-                        "/spaceinvaders/resources/audio/sfx/imp_ricco_02.wav",
-                        "/spaceinvaders/resources/audio/sfx/imp_ricco_03.wav",
-                        "/spaceinvaders/resources/audio/sfx/imp_ricco_04.wav",
-                        "/spaceinvaders/resources/audio/sfx/imp_ricco_06.wav",
-                        "/spaceinvaders/resources/audio/sfx/imp_ricco_08.wav",
-                        "/spaceinvaders/resources/audio/sfx/imp_ricco_12.wav"
-                    );
-                } catch (Throwable ignored) {}
-            }
+            playBounceSfx();
 
             // legendary split ON FIRST bounce
             if (legendarySplitEnabled && !splitUsed) {
@@ -132,25 +121,25 @@ public class Blade extends Bullet {
                 int childSpeedX = Math.max(2, Math.abs(this.vx) + 2);
 
                 spawned.add(new Blade(
-                    this.x, this.y,
-                    -childSpeedX, childVY,
-                    this.size,
-                    Math.max(0, bouncesRemaining - 1),
-                    Math.max(1, pierceRemaining - 1),
-                    false, // no recursion
-                    verticalBounceEnabled,
-                    this.armorPiercing
+                        this.x, this.y,
+                        -childSpeedX, childVY,
+                        this.size,
+                        Math.max(0, bouncesRemaining - 1),
+                        Math.max(1, pierceRemaining - 1),
+                        false, // no recursion
+                        verticalBounceEnabled,
+                        this.armorPiercing
                 ));
 
                 spawned.add(new Blade(
-                    this.x, this.y,
-                    +childSpeedX, childVY,
-                    this.size,
-                    Math.max(0, bouncesRemaining - 1),
-                    Math.max(1, pierceRemaining - 1),
-                    false,
-                    verticalBounceEnabled,
-                    this.armorPiercing
+                        this.x, this.y,
+                        +childSpeedX, childVY,
+                        this.size,
+                        Math.max(0, bouncesRemaining - 1),
+                        Math.max(1, pierceRemaining - 1),
+                        false,
+                        verticalBounceEnabled,
+                        this.armorPiercing
                 ));
             }
         }
@@ -160,36 +149,37 @@ public class Blade extends Bullet {
 
         if (hitTop || hitBottom) {
             if (!verticalBounceEnabled) {
-                pierceRemaining = 0; // mark dead
+                pierceRemaining = 0; // die
             } else {
                 if (hitTop) this.y = half;
                 if (hitBottom) this.y = worldH - half;
+
                 this.vy = -this.vy;
-
-                // optional flash on vertical bounce too
                 flashMs = 110;
-
-                if (bounceSfxCdMs <= 0) {
-                    bounceSfxCdMs = 90;
-                    try {
-                        AudioManager.get().playRandomSfx(
-                            0.20f,
-                            "/spaceinvaders/resources/audio/sfx/imp_ricco_02.wav",
-                            "/spaceinvaders/resources/audio/sfx/imp_ricco_03.wav",
-                            "/spaceinvaders/resources/audio/sfx/imp_ricco_04.wav",
-                            "/spaceinvaders/resources/audio/sfx/imp_ricco_06.wav",
-                            "/spaceinvaders/resources/audio/sfx/imp_ricco_08.wav",
-                            "/spaceinvaders/resources/audio/sfx/imp_ricco_12.wav"
-                        );
-                    } catch (Throwable ignored) {}
-                }
+                playBounceSfx();
             }
         }
 
-        if (lifeMs >= maxLifeMs) pierceRemaining = 0;
+        if (lifeMs >= MAX_LIFE_MS) pierceRemaining = 0;
         if (bouncesRemaining < 0) pierceRemaining = 0;
 
         return spawned;
+    }
+
+    private void playBounceSfx() {
+        if (bounceSfxCdMs > 0) return;
+        bounceSfxCdMs = 90;
+        try {
+            AudioManager.get().playRandomSfx(
+                    0.20f,
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_02.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_03.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_04.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_06.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_08.wav",
+                    "/spaceinvaders/resources/audio/sfx/imp_ricco_12.wav"
+            );
+        } catch (Throwable ignored) {}
     }
 
     /** Call when blade hits an invader. Returns true if it should despawn now. */

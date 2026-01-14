@@ -85,9 +85,9 @@ public class Player {
     // -------- Missile (legendary) --------
     public boolean upMissileSmart = false;
     public boolean upShrapnelSmart = false;
-    public int upShrapnelArmorPierce = 0;       // 2 ranks (penetrates +3 enemies)
+    public int upShrapnelArmorPierce = 0;       // 2 ranks (each rank: +3 penetrations, you’ll wire in shrapnel bullet logic later)
     public boolean upMissileImpactAOE = false;
-    public int secretTechMissile = 0;           // 0/1 (first time = “???”, second reveals effect later)
+    public int secretTechMissile = 0;           // 0/1 (your “??? then reveals later” flow)
 
     // -------- Blade (basic) --------
     public int upBladeNorthRicochet = 0;        // 1
@@ -114,7 +114,7 @@ public class Player {
 
     // -------- Basic shot (legendary) --------
     public boolean upBasicSmart = false;
-    public int upBasicOvertuned6 = 0;           // 2 ranks; (chance 6% each rank? you can tune later)
+    public int upBasicOvertuned6 = 0;           // 2 ranks
     public boolean upBasicMoneyShot = false;
     public boolean upBasicSystemsFried = false;
 
@@ -127,7 +127,7 @@ public class Player {
 
     // -------- Player (legendary) --------
     public boolean upHybridWeaponCore = false;  // only shows if both secret techs selected later
-    public int upYwingSupport = 0;              // 3 ranks; consume on death later
+    public int upYwingSupport = 0;              // 3 ranks
     public boolean upSmarterTargeting = false;
     public boolean upPersonalShield = false;
 
@@ -158,7 +158,8 @@ public class Player {
 
     public int missileCount() {
         // base 1 missile, each rank adds +1, max 3 total by your design
-        return 1 + Math.max(0, upMissilePlus1);
+        int count = 1 + Math.max(0, upMissilePlus1);
+        return Math.max(1, Math.min(3, count));
     }
 
     public int missileDamage(int base) {
@@ -209,13 +210,13 @@ public class Player {
     /** Apply player upgrades that scale core stats. Call this after selecting upgrades. */
     public void recomputeCoreStats() {
         // speed
-        speedPx = (int)Math.round(8 * (1.0 + 0.35 * upPlayerSpeed35));
+        speedPx = (int) Math.round(8 * (1.0 + 0.35 * upPlayerSpeed35));
 
-        // hp/border
+        // max hp/border
         maxHp = 10 + 15 * upPlayerHp15_Border25;
         maxBorderHp = 25 + 25 * upPlayerHp15_Border25;
 
-        // clamp
+        // keep current, clamp to max (change to "hp = maxHp" if you want upgrades to refill)
         hp = Math.min(hp, maxHp);
         borderHp = Math.min(borderHp, maxBorderHp);
     }

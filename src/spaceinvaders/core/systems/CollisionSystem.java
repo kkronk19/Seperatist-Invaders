@@ -9,6 +9,7 @@ import spaceinvaders.core.entities.Bullet;
 import spaceinvaders.core.entities.EnemyBullet;
 import spaceinvaders.core.entities.Invader;
 import spaceinvaders.core.entities.Missile;
+import spaceinvaders.core.entities.Player;
 import spaceinvaders.services.audio.AudioManager;
 
 public final class CollisionSystem {
@@ -56,6 +57,7 @@ public final class CollisionSystem {
     public static void bulletsVsInvaders(
             List<Bullet> bullets,
             List<Invader> invaders,
+            Player player,
             ShrapnelSpawner shrapnelSpawner
     ) {
         Rectangle br = new Rectangle();
@@ -84,23 +86,57 @@ public final class CollisionSystem {
 
                 boolean hadShield = inv.shieldHits > 0;
 
-                // --- Armor rule (only for blades) ---
+                // --------------------------
+                // DAMAGE MODIFIERS / SPECIAL RULES
+                // --------------------------
                 int appliedDamage = b.damage;
-                boolean forceBladeStop = false;
 
+                // If armored and bullet is NOT armor piercing -> reduce to 1 dmg.
+                // Additionally, armored targets stop non-AP, non-blade projectiles (prevents "pierced shots").
+                boolean forceStopNonBlade = false;
+
+                if (inv.armored) {
+                    if (b instanceof Blade blade) {
+                        // blades already have their own armor rule
+                        if (!blade.armorPiercing) {
+                            appliedDamage = 1;
+                            // blade consumes all pierce after this hit (handled below)
+                        }
+                    } else {
+                        if (!b.armorPiercing) {
+                            appliedDamage = 1;
+                            forceStopNonBlade = true; // armored "soaks" the projectile (no pierce-through)
+                        }
+                    }
+                }
+
+                // Blade-only "consume all pierce" flag when it hits armor without AP
+                boolean forceBladeStop = false;
                 if (b instanceof Blade blade) {
                     if (inv.armored && !blade.armorPiercing) {
-                        appliedDamage = 1;     // always 1 dmg vs armor if not AP
-                        forceBladeStop = true; // consume ALL pierce after this hit
+                        forceBladeStop = true;
                     }
                 }
 
                 Invader.HitResult res = inv.takeHit(appliedDamage);
 
                 boolean shieldBroke = hadShield && inv.shieldHits == 0 && res == Invader.HitResult.ABSORBED;
+                if (shieldBroke) {
+                    inv.shieldBreakFlashMs = 140; // visual flash on break
+                }
 
+                // --------------------------
+                // KILL: remove invader + award points
+                // --------------------------
                 if (res == Invader.HitResult.KILLED) {
                     iit.remove();
+
+                    if (player != null) {
+                        int award = inv.scoreValue;
+                        if (b.moneyShot) award *= 2; // legendary: double points on kill
+                        player.addPoints(award);
+                    }
+
                     try { playDeathSfxFor(inv); } catch (Throwable ignored) {}
                 }
 
@@ -111,8 +147,9 @@ public final class CollisionSystem {
 
                     // Blade vs shield: reflect + bounce, don't consume pierce
                     if (b instanceof Blade) {
-                        try { AudioManager.get().playRandomSfx(0.40f, SFX_REFLECT_1, SFX_REFLECT_2, SFX_REFLECT_3); }
-                        catch (Throwable ignored) {}
+                        try {
+                            AudioManager.get().playRandomSfx(0.40f, SFX_REFLECT_1, SFX_REFLECT_2, SFX_REFLECT_3);
+                        } catch (Throwable ignored) {}
 
                         if (shieldBroke) {
                             try { AudioManager.get().playSfx(SFX_SHIELD_DEPLETED, 0.60f); } catch (Throwable ignored) {}
@@ -125,13 +162,14 @@ public final class CollisionSystem {
                         removeBullet = false;
                     }
 
-                    // Missile vs shield: 25% deflect (KEEP missile look + trail, NO SINE)
+                    // Missile vs shield: 25% deflect
                     else if (b.kind == Bullet.BulletKind.MISSILE) {
                         boolean deflect = Math.random() < ROCKET_DEFLECT_CHANCE;
 
                         if (deflect) {
-                            try { AudioManager.get().playRandomSfx(0.45f, SFX_REFLECT_1, SFX_REFLECT_2, SFX_REFLECT_3); }
-                            catch (Throwable ignored) {}
+                            try {
+                                AudioManager.get().playRandomSfx(0.45f, SFX_REFLECT_1, SFX_REFLECT_2, SFX_REFLECT_3);
+                            } catch (Throwable ignored) {}
 
                             if (shieldBroke) {
                                 try { AudioManager.get().playSfx(SFX_SHIELD_DEPLETED, 0.60f); } catch (Throwable ignored) {}
@@ -178,14 +216,27 @@ public final class CollisionSystem {
 
                 } else if (b instanceof Blade blade) {
                     if (forceBladeStop) {
-                        blade.consumeAllPierce(); // consume all penetration and despawn
+                        blade.consumeAllPierce();
                         removeBullet = true;
                     } else {
                         removeBullet = blade.onHitInvader();
                     }
 
                 } else {
-                    removeBullet = true;
+                    // BASIC (and any other non-blade, non-missile):
+                    // If armor forced stop, remove it.
+                    if (forceStopNonBlade) {
+                        removeBullet = true;
+                    } else if (b.pierce > 0) {
+                        // pierce means it survives THIS hit and can hit more enemies later
+                        b.pierce--;
+                        removeBullet = false;
+
+                        // tiny nudge so it doesn't re-hit same invader due to overlap
+                        b.y += (b.vy < 0) ? -2 : 2;
+                    } else {
+                        removeBullet = true;
+                    }
                 }
 
                 break; // one invader hit per bullet per frame
@@ -200,7 +251,7 @@ public final class CollisionSystem {
     private static void playDeathSfxFor(Invader inv) {
         switch (inv.kind) {
             case TANK:
-                AudioManager.get().playRandomSfx(0.90f, SFX_TANK_DEATH_1, SFX_TANK_DEATH_2, SFX_TANK_DEATH_3);
+                AudioManager.get().playRandomSfx(1.0f, SFX_TANK_DEATH_1, SFX_TANK_DEATH_2, SFX_TANK_DEATH_3);
                 break;
 
             case SWARMER:
@@ -228,7 +279,7 @@ public final class CollisionSystem {
             case BASIC:
             default:
                 AudioManager.get().playRandomSfx(
-                        1.1f,
+                        0.95f,
                         "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
                         "/spaceinvaders/resources/audio/sfx/CICOM408.wav",
                         "/spaceinvaders/resources/audio/sfx/CICOM409.wav"

@@ -43,7 +43,6 @@ public class Invader {
     // armored that prevents pierced shots
     public boolean armored = false;
 
-
     /** Result of a hit attempt */
     public enum HitResult {
         ABSORBED,   // shield absorbed the hit, no HP damage
@@ -58,7 +57,6 @@ public class Invader {
         this.height = h;
         this.kind = kind;
         this.pattern = pattern;
-        this.armored = (kind == InvaderKind.TANK);
 
         // defaults
         this.vx = 0;
@@ -67,11 +65,68 @@ public class Invader {
         this.touchDamage = 1;
         this.scoreValue = 10;
 
-        // Shielded enemies absorb exactly one hit
-        this.shieldHits = (kind == InvaderKind.SHIELDED) ? 1 : 0;
+        this.shieldHits = 0;
+        this.armored = false;
+
+        applyKindDefaults(kind);
 
         this.dropChance = 0.0;
         this.dropKind = LootKind.NONE;
+    }
+
+    private void applyKindDefaults(InvaderKind k) {
+        if (k == null) return;
+
+        switch (k) {
+            case BASIC:
+                hp = 1;
+                touchDamage = 1;
+                scoreValue = 10;
+                vy = 2;
+                shieldHits = 0;
+                armored = false;
+                break;
+
+            case SHIELDED:
+                hp = 1;
+                touchDamage = 1;
+                scoreValue = 15;
+                vy = 2;
+                shieldHits = 1;     // absorbs exactly 1 hit
+                armored = false;
+                break;
+
+            case SWARMER:
+                hp = 1;
+                touchDamage = 1;
+                scoreValue = 8;
+                vy = 3;             // a bit faster
+                shieldHits = 0;
+                armored = false;
+                break;
+
+            case SHOOTER:
+                hp = 1;
+                touchDamage = 1;
+                scoreValue = 12;
+                vy = 1;             // hangs back
+                shieldHits = 0;
+                armored = false;
+                break;
+
+            case TANK:
+                hp = 6;
+                touchDamage = 2;
+                scoreValue = 40;
+                vy = 1;
+                shieldHits = 0;
+                armored = true;     // armored tanks
+                break;
+
+            default:
+                // bosses etc — keep whatever you set elsewhere
+                break;
+        }
     }
 
     /**

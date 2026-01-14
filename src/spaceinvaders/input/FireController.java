@@ -1,19 +1,26 @@
 package spaceinvaders.input;
 
-import spaceinvaders.core.entities.Bullet;
-import spaceinvaders.weapons.Weapon;
-
 import java.util.ArrayList;
 import java.util.List;
+import spaceinvaders.core.entities.Bullet;
+import spaceinvaders.core.entities.Player;
+import spaceinvaders.weapons.Weapon;
 
+/**
+ * Central input->weapon dispatcher.
+ * Owns weapon instances; weapons read Player for upgrades.
+ */
 public class FireController {
     private final Weapon primary;    // Space (hold)
     private final Weapon secondary;  // R (tap)
 
+    private final Player player;
+
     private boolean primaryHeld = false;
     private boolean pendingSecondaryTap = false;
 
-    public FireController(Weapon primary, Weapon secondary) {
+    public FireController(Player player, Weapon primary, Weapon secondary) {
+        this.player = player;
         this.primary = primary;
         this.secondary = secondary;
     }
@@ -27,10 +34,8 @@ public class FireController {
         if (primary != null) {
             primary.tryFire(nowMs, mx, my, primaryHeld, spawned);
         }
-        if (secondary != null) {
-            if (pendingSecondaryTap) {
-                secondary.tryFire(nowMs, mx, my, false, spawned);
-            }
+        if (secondary != null && pendingSecondaryTap) {
+            secondary.tryFire(nowMs, mx, my, false, spawned);
         }
         pendingSecondaryTap = false;
 
@@ -43,6 +48,11 @@ public class FireController {
         if (primary != null)   primary.updateBullets(nowMs, allPlus, w, h);
         if (secondary != null) secondary.updateBullets(nowMs, allPlus, w, h);
 
+        // OPTIONAL (next step): if player points reached threshold, your scene can pause + show upgrade menu.
+        // if (player != null && player.pointsBanked >= player.nextUpgradeCost) { ... }
+
         return spawned; // Scene still owns adding them to its 'bullets' list
     }
+
+    public Player getPlayer() { return player; }
 }

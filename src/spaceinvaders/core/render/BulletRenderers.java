@@ -1,13 +1,12 @@
 package spaceinvaders.core.render;
 
-import spaceinvaders.core.GameState;
-import spaceinvaders.core.entities.Bullet;
-import spaceinvaders.core.entities.Missile;
-import spaceinvaders.core.entities.Blade;
-
 import java.awt.Graphics2D;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import spaceinvaders.core.GameState;
+import spaceinvaders.core.entities.Blade;
+import spaceinvaders.core.entities.Bullet;
+import spaceinvaders.core.entities.Missile;
 
 /** Registry + dispatcher for bullet rendering strategies. */
 public final class BulletRenderers {
@@ -16,12 +15,12 @@ public final class BulletRenderers {
     private static final Map<Class<?>, BulletRenderer> REGISTRY = new LinkedHashMap<>();
 
     static {
-        // register defaults
-        register(Bullet.class,  new DefaultBulletRenderer());
+        // register most-specific FIRST
         register(Missile.class, new MissileRenderer());
+        register(Blade.class,   new BladeRenderer());
 
-        // NEW: Blade rendering
-        register(Blade.class, new BladeRenderer());
+        // default LAST so it doesn't steal subclasses in assignable lookup
+        register(Bullet.class,  new DefaultBulletRenderer());
     }
 
     public static void register(Class<?> bulletClass, BulletRenderer renderer) {
@@ -38,12 +37,12 @@ public final class BulletRenderers {
         BulletRenderer r = REGISTRY.get(cls);
         if (r != null) return r;
 
-        // fallback: find first renderer whose key is assignable from cls
+        // fallback: first renderer whose key is assignable from cls
         for (Map.Entry<Class<?>, BulletRenderer> e : REGISTRY.entrySet()) {
             if (e.getKey().isAssignableFrom(cls)) return e.getValue();
         }
 
-        // ultimate fallback: default bullet renderer
+        // ultimate fallback
         return REGISTRY.get(Bullet.class);
     }
 }

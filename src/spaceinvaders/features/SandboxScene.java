@@ -31,9 +31,9 @@ public class SandboxScene implements Scene {
     private final GameState state;
     private final SceneManager scenes;
     private final Random rng = new Random();
-    private Player player;
 
     private FireController fire;
+    private Player player; // alias to state.player
 
     private final List<Bullet> bullets = new ArrayList<>();
     private final List<Invader> invaders = new ArrayList<>();
@@ -41,26 +41,38 @@ public class SandboxScene implements Scene {
     private boolean moveLeft, moveRight;
     private long nextSpawnMs = 0;
 
-    private static final String IMG_BASIC    = "image/b1_droid.png";
-    private static final String IMG_TANK     = "image/aat.png";
-    private static final String IMG_SHIELDED = "image/droideka.png";
-    private static final String IMG_SHOOTER  = "image/bx_commando_droid.png";
-    private static final String IMG_SWARMER  = "image/buzz_droid.png";
+    // --- Blade weapon config / upgrades (sandbox-local for now) ---
+    private int bladeCooldownMs = 0;
+    private static final int BLADE_COOLDOWN = 850;
+    private static final int BLADE_PIERCE  = 3;
+    private static final int BLADE_BOUNCES = 3;
 
-    private boolean assetsLoaded = false;
+    private boolean bladeVerticalBounce = false;
+    private boolean bladeLegendarySplit = false;
+
+    public SandboxScene(GameState state, SceneManager scenes) {
+        this.state = state;
+        this.scenes = scenes;
+    }
 
     private List<Bullet> spawnShrapnel(int cx, int cy) {
-        final int shards = 5;
-        final int size   = 6;
-        final int dmg    = 1;
-        final int speed  = 6;
+        final int baseShards = 5;
+        final int size = 6;
+        final int baseDmg = 1;
+        final int speed = 6;
+
+        // If you later want missile shrapnel upgrades, read them from player here
+        int shards = baseShards; // player.missileShrapnelCount(baseShards);
+        int dmg = baseDmg;       // player.missileShrapnelDamage(baseDmg);
 
         List<Bullet> out = new ArrayList<>(shards);
         for (int i = 0; i < shards; i++) {
             double angle = rng.nextDouble() * Math.PI * 2.0;
             int vx = (int) Math.round(Math.cos(angle) * speed);
             int vy = (int) Math.round(Math.sin(angle) * speed);
-            out.add(new Bullet(cx, cy, vx, vy, size, dmg, Bullet.BulletKind.BASIC));
+
+            Bullet b = new Bullet(cx, cy, vx, vy, size, dmg, Bullet.BulletKind.BASIC);
+            out.add(b);
         }
 
         try {
@@ -70,54 +82,31 @@ public class SandboxScene implements Scene {
         return out;
     }
 
-    // --- Blade weapon config / upgrades ---
-    private int bladeCooldownMs = 0;
-    private static final int BLADE_COOLDOWN = 850;
-    private static final int BLADE_PIERCE  = 3;
-    private static final int BLADE_BOUNCES = 3;
-
-    // for now these are off in sandbox (you’ll wire to Player upgrades later)
-    private boolean bladeVerticalBounce = false;
-    private boolean bladeLegendarySplit = false;
-
-    public SandboxScene(GameState state, SceneManager scenes) {
-        this.state = state;
-        this.scenes = scenes;
-    }
-
     @Override
     public void onEnter() {
         System.out.println("[Sandbox] Entered");
         state.mode = GameState.AppMode.SANDBOX;
         state.playerX = state.width / 2 - state.playerWidth / 2;
 
-        // keep your current weapons (no Player wiring yet)
-        player = new Player(); // defaults for now
-        fire = new FireController(
-                new BlasterWeapon(),
-                new MissileWeapon(player)
-        );
+        // Use the ONE true player from GameState
+        player = state.player;
+
+        // Weapons read upgrades from Player
+        fire = new FireController(player, new BlasterWeapon(player), new MissileWeapon(player));
 
 
         // ---------- LOAD IMAGES ONCE ----------
-        loadInvaderImagesOnce();
-
-        try { AudioManager.get().stopLoop("menu"); } catch (Throwable ignored) {}
-    }
-
-    private void loadInvaderImagesOnce() {
-        if (assetsLoaded) return;
-        assetsLoaded = true;
-
         try {
-            state.invaderImageBasic    = AssetLoader.imageFromResource(IMG_BASIC);
-            state.invaderImageTank     = AssetLoader.imageFromResource(IMG_TANK);
-            state.invaderImageShielded = AssetLoader.imageFromResource(IMG_SHIELDED);
-            state.invaderImageShooter  = AssetLoader.imageFromResource(IMG_SHOOTER);
-            state.invaderImageSwarmer  = AssetLoader.imageFromResource(IMG_SWARMER);
+            state.invaderImageBasic    = AssetLoader.imageFromResource("image/b1_droid.png");
+            state.invaderImageTank     = AssetLoader.imageFromResource("image/aat.png");
+            state.invaderImageShielded = AssetLoader.imageFromResource("image/droideka.png");
+            state.invaderImageShooter  = AssetLoader.imageFromResource("image/bx_commando_droid.png");
+            state.invaderImageSwarmer  = AssetLoader.imageFromResource("image/buzz_droid.png");
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        try { AudioManager.get().stopLoop("menu"); } catch (Throwable ignored) {}
     }
 
     @Override
@@ -172,28 +161,32 @@ public class SandboxScene implements Scene {
         int vy = -4;
         int size = 10;
 
-        // NOTE: your Blade constructor currently has 9 params in your version:
-        // (x,y,vx,vy,size,bounces,pierce,legendarySplit,verticalBounce,armorPiercing)
+        // If you want blade upgrades from Player soon:
+        // int pierce = BLADE_PIERCE + player.bladeExtraPierce();
+        // int bounces = BLADE_BOUNCES + player.bladeExtraBounces();
+        // int dmg = player.bladeDamage(1);
+        // boolean ap = player.upBladeArmorPen;
+
         bullets.add(new Blade(
-            muzzleX, muzzleY,
-            -vx, vy,
-            size,
-            BLADE_BOUNCES,
-            BLADE_PIERCE,
-            bladeLegendarySplit,
-            bladeVerticalBounce,
-            false
+                muzzleX, muzzleY,
+                -vx, vy,
+                size,
+                BLADE_BOUNCES,
+                BLADE_PIERCE,
+                bladeLegendarySplit,
+                bladeVerticalBounce,
+                false
         ));
 
         bullets.add(new Blade(
-            muzzleX, muzzleY,
-            +vx, vy,
-            size,
-            BLADE_BOUNCES,
-            BLADE_PIERCE,
-            bladeLegendarySplit,
-            bladeVerticalBounce,
-            false
+                muzzleX, muzzleY,
+                +vx, vy,
+                size,
+                BLADE_BOUNCES,
+                BLADE_PIERCE,
+                bladeLegendarySplit,
+                bladeVerticalBounce,
+                false
         ));
 
         bladeCooldownMs = BLADE_COOLDOWN;
@@ -211,9 +204,10 @@ public class SandboxScene implements Scene {
         // --- Blade cooldown ---
         if (bladeCooldownMs > 0) bladeCooldownMs -= dtMs;
 
-        // --- Player movement ---
-        if (moveLeft)  state.playerX -= 8;
-        if (moveRight) state.playerX += 8;
+        // --- Player movement (use player.speedPx) ---
+        int step = (player != null) ? player.speedPx : 8;
+        if (moveLeft)  state.playerX -= step;
+        if (moveRight) state.playerX += step;
         state.playerX = Math.max(0, Math.min(state.playerX, state.width - state.playerWidth));
 
         // --- Fire ---
@@ -276,7 +270,7 @@ public class SandboxScene implements Scene {
                 s.hp = 1;
                 s.touchDamage = 1;
                 s.scoreValue = 10;
-                s.vy = 1; // slow hang-back
+                s.vy = 1;
                 invaders.add(s);
 
             } else {
@@ -285,14 +279,14 @@ public class SandboxScene implements Scene {
                 t.vy = 1;
                 t.scoreValue = 40;
                 t.touchDamage = 2;
-                t.armored = true; // IMPORTANT for your blade armor logic
+                t.armored = true;
                 invaders.add(t);
             }
 
             nextSpawnMs = now + 610 + rng.nextInt(600);
         }
 
-        // --- Invader movement + timers ---
+        // --- Invader movement + cleanup ---
         for (Iterator<Invader> it = invaders.iterator(); it.hasNext();) {
             Invader inv = it.next();
 
@@ -308,12 +302,8 @@ public class SandboxScene implements Scene {
         // --- Shooter attacks ---
         InvaderAttackSystem.spawnShooterBullets(invaders, bullets);
 
-        // --- Collisions ---
-        CollisionSystem.bulletsVsInvaders(
-            bullets,
-            invaders,
-            this::spawnShrapnel
-        );
+        // --- Collisions (passes player so kills award points) ---
+        CollisionSystem.bulletsVsInvaders(bullets, invaders, player, this::spawnShrapnel);
     }
 
     @Override

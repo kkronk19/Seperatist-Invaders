@@ -1,15 +1,14 @@
 package spaceinvaders.features;
 
-import spaceinvaders.core.GameState;
-import spaceinvaders.core.entities.Bullet;
-import spaceinvaders.services.audio.AudioManager;
-
-import javax.imageio.ImageIO;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import javax.imageio.ImageIO;
+import spaceinvaders.core.GameState;
+import spaceinvaders.core.entities.Bullet;
+import spaceinvaders.services.audio.AudioManager;
 
 /**
  * Title/start menu background demo:
@@ -48,7 +47,8 @@ public class StartMenuDemo {
     public void handleTitleCollisions(List<Bullet> bullets) {
         for (int i = bullets.size() - 1; i >= 0; i--) {
             Bullet b = bullets.get(i);
-            Rectangle br = new Rectangle(b.x - 5, b.y - 5, 10, 10);
+            Rectangle br = new Rectangle(b.x, b.y, b.size, b.size);
+
 
             boolean hit = false;
             for (int j = invaders.size() - 1; j >= 0 && !hit; j--) {
@@ -62,10 +62,10 @@ public class StartMenuDemo {
 
                     try {
                         AudioManager.get().playRandomSfx(
-                            1.10f,
-                            "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
-                            "/spaceinvaders/resources/audio/sfx/CICOM408.wav",
-                            "/spaceinvaders/resources/audio/sfx/CICOM409.wav"
+                                1.10f,
+                                "/spaceinvaders/resources/audio/sfx/CICOM401.wav",
+                                "/spaceinvaders/resources/audio/sfx/CICOM408.wav",
+                                "/spaceinvaders/resources/audio/sfx/CICOM409.wav"
                         );
                     } catch (Throwable ignored) {}
                 }
