@@ -29,7 +29,7 @@ public class MissileWeapon implements Weapon {
 
     @Override
     public void tryFire(long nowMs, int mx, int my, boolean isHeld, List<Bullet> out) {
-        // This weapon is intended to be "tap fired" via FireController secondary.
+        // Tap-fired via FireController secondary.
         int cd = effectiveCooldownMs();
         if (nowMs - lastShot < cd) return;
         lastShot = nowMs;
@@ -49,8 +49,12 @@ public class MissileWeapon implements Weapon {
 
             Missile m = new Missile(mx - size / 2 + ox, my, 0, vy, size, dmg);
 
-            // straight upgrade: disable snake behavior
-            m.straightFlight = player.upMissileStraight;
+            // ---- Smart targeting flag (MISSILE legendary) ----
+            m.smartTargeting = player.upMissileSmart;
+
+            // Straight flight if player bought straight OR smart targeting is on
+            // (smart targeting must not fight the snake path)
+            m.straightFlight = player.upMissileStraight || m.smartTargeting;
 
             out.add(m);
             born.put(m, nowMs);
