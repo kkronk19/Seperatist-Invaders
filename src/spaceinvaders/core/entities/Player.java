@@ -33,6 +33,9 @@ public class Player {
     /** Next threshold required to offer upgrade. You can tune this later. */
     public int nextUpgradeCost = 100;
 
+    public boolean upBladeVerticalBounce = false;
+    public boolean upBladeLegendarySplit = false;
+
     /** Earn points (kill reward, etc.). Returns true if you should offer upgrades now. */
     public boolean addPoints(int amount) {
         if (amount <= 0) return false;
