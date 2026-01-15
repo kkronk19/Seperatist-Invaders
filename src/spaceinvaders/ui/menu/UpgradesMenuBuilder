@@ -1,0 +1,67 @@
+package spaceinvaders.ui.menu;
+
+import spaceinvaders.core.entities.Player;
+
+import javax.swing.*;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
+import java.util.function.Supplier;
+
+public final class UpgradesMenuBuilder {
+    private UpgradesMenuBuilder() {}
+
+    public static JMenu buildBasicMenu(Player p) {
+        JMenu m = new JMenu("Blaster");
+
+        m.add(toggle("Armor Piercing", () -> p.upBasicArmorPierce, v -> p.upBasicArmorPierce = v));
+        m.add(toggle("Smart Targeting", () -> p.upBasicSmart, v -> p.upBasicSmart = v));
+        m.add(toggle("Money Shot", () -> p.upBasicMoneyShot, v -> p.upBasicMoneyShot = v));
+        m.add(toggle("Systems Fried", () -> p.upBasicSystemsFried, v -> p.upBasicSystemsFried = v));
+
+        m.addSeparator();
+        m.add(levelMenu("Overtuned (0-6)", 0, 6,
+                () -> p.upBasicOvertuned6,
+                v -> p.upBasicOvertuned6 = v
+        ));
+
+        return m;
+    }
+
+    public static JMenu buildMissileMenu(Player p) {
+        JMenu m = new JMenu("Missile");
+        m.add(toggle("Straight Flight", () -> p.upMissileStraight, v -> p.upMissileStraight = v));
+
+        // If you have levels like p.upMissileCount or p.upMissileDamageLvl, add them the same way:
+        // m.add(levelMenu("Count", 1, 3, () -> p.upMissileCount, v -> p.upMissileCount = v));
+
+        return m;
+    }
+
+    public static JMenu buildBladeMenu(Player p) {
+        JMenu m = new JMenu("Blade");
+        // add these fields to Player (recommended)
+        m.add(toggle("Vertical Bounce", () -> p.upBladeVerticalBounce, v -> p.upBladeVerticalBounce = v));
+        m.add(toggle("Legendary Split", () -> p.upBladeLegendarySplit, v -> p.upBladeLegendarySplit = v));
+        return m;
+    }
+
+    private static JMenuItem toggle(String label, Supplier<Boolean> getter, java.util.function.Consumer<Boolean> setter) {
+        JCheckBoxMenuItem item = new JCheckBoxMenuItem(label, getter.get());
+        item.addActionListener(e -> setter.accept(item.isSelected()));
+        return item;
+    }
+
+    private static JMenu levelMenu(String label, int min, int max, IntSupplier getter, IntConsumer setter) {
+        JMenu menu = new JMenu(label);
+        ButtonGroup group = new ButtonGroup();
+
+        for (int v = min; v <= max; v++) {
+            final int value = v;
+            JRadioButtonMenuItem it = new JRadioButtonMenuItem(String.valueOf(v), getter.getAsInt() == v);
+            it.addActionListener(e -> setter.accept(value));
+            group.add(it);
+            menu.add(it);
+        }
+        return menu;
+    }
+}

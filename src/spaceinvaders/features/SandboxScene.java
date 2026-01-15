@@ -1,8 +1,6 @@
 package spaceinvaders.features;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.Image;
+import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -19,7 +17,9 @@ import spaceinvaders.core.entities.ShooterZigZagPattern;
 import spaceinvaders.core.entities.SwarmerZigZagPattern;
 import spaceinvaders.core.systems.CollisionSystem;
 import spaceinvaders.core.systems.InvaderAttackSystem;
+import spaceinvaders.core.systems.SmartTargetingSystem;
 import spaceinvaders.input.FireController;
+import spaceinvaders.input.SandboxCloneController;
 import spaceinvaders.services.audio.AudioManager;
 import spaceinvaders.services.loading.AssetLoader;
 import spaceinvaders.weapons.BlasterWeapon;
@@ -33,22 +33,25 @@ public class SandboxScene implements Scene {
     private final Random rng = new Random();
 
     private FireController fire;
-    private Player player; // alias to state.player
+    private Player player;
 
     private final List<Bullet> bullets = new ArrayList<>();
     private final List<Invader> invaders = new ArrayList<>();
 
+    // clones (sandbox AI)
+    private final List<SandboxCloneController> clones = new ArrayList<>();
+    private Image cloneImg; // optional
+
     private boolean moveLeft, moveRight;
     private long nextSpawnMs = 0;
 
-    // --- Blade weapon config / upgrades (sandbox-local for now) ---
+    // Blade cooldown (player blade when pressing F)
     private int bladeCooldownMs = 0;
     private static final int BLADE_COOLDOWN = 850;
-    private static final int BLADE_PIERCE  = 3;
-    private static final int BLADE_BOUNCES = 3;
 
-    private boolean bladeVerticalBounce = false;
-    private boolean bladeLegendarySplit = false;
+    // base blade stats
+    private static final int BASE_BLADE_PIERCE  = 3;
+    private static final int BASE_BLADE_BOUNCES = 3;
 
     public SandboxScene(GameState state, SceneManager scenes) {
         this.state = state;
@@ -61,18 +64,15 @@ public class SandboxScene implements Scene {
         final int baseDmg = 1;
         final int speed = 6;
 
-        // If you later want missile shrapnel upgrades, read them from player here
-        int shards = baseShards; // player.missileShrapnelCount(baseShards);
-        int dmg = baseDmg;       // player.missileShrapnelDamage(baseDmg);
+        int shards = baseShards;
+        int dmg = baseDmg;
 
         List<Bullet> out = new ArrayList<>(shards);
         for (int i = 0; i < shards; i++) {
             double angle = rng.nextDouble() * Math.PI * 2.0;
             int vx = (int) Math.round(Math.cos(angle) * speed);
             int vy = (int) Math.round(Math.sin(angle) * speed);
-
-            Bullet b = new Bullet(cx, cy, vx, vy, size, dmg, Bullet.BulletKind.BASIC);
-            out.add(b);
+            out.add(new Bullet(cx, cy, vx, vy, size, dmg, Bullet.BulletKind.BASIC));
         }
 
         try {
@@ -88,25 +88,28 @@ public class SandboxScene implements Scene {
         state.mode = GameState.AppMode.SANDBOX;
         state.playerX = state.width / 2 - state.playerWidth / 2;
 
-        // Use the ONE true player from GameState
         player = state.player;
 
-        // Weapons read upgrades from Player
         fire = new FireController(player, new BlasterWeapon(player), new MissileWeapon(player));
 
-
-        // ---------- LOAD IMAGES ONCE ----------
+        // LOAD IMAGES ONCE
         try {
             state.invaderImageBasic    = AssetLoader.imageFromResource("image/b1_droid.png");
             state.invaderImageTank     = AssetLoader.imageFromResource("image/aat.png");
             state.invaderImageShielded = AssetLoader.imageFromResource("image/droideka.png");
             state.invaderImageShooter  = AssetLoader.imageFromResource("image/bx_commando_droid.png");
             state.invaderImageSwarmer  = AssetLoader.imageFromResource("image/buzz_droid.png");
+
+            // clone sprite (optional)
+            cloneImg = AssetLoader.imageFromResource("image/p1_clone.png");
         } catch (Exception e) {
             e.printStackTrace();
         }
 
         try { AudioManager.get().stopLoop("menu"); } catch (Throwable ignored) {}
+
+        // sync initial clone count
+        syncClonesToUpgrade();
     }
 
     @Override
@@ -114,11 +117,31 @@ public class SandboxScene implements Scene {
         System.out.println("[Sandbox] Exited");
     }
 
+    /** Keep sandbox clones count exactly equal to player.upCloneReinforcement (0..5). */
+    private void syncClonesToUpgrade() {
+        if (player == null) return;
+
+        int desired = Math.max(0, Math.min(5, player.upCloneReinforcement));
+
+        // add missing
+        while (clones.size() < desired) {
+            int sx = rng.nextInt(Math.max(1, state.width - state.playerWidth));
+            int sy = rng.nextInt(Math.max(1, state.height - state.playerHeight - 120));
+            clones.add(new SandboxCloneController(sx, sy, System.nanoTime() ^ rng.nextLong()));
+        }
+
+        // remove extras
+        while (clones.size() > desired) {
+            clones.remove(clones.size() - 1);
+        }
+    }
+
     @Override
     public void handleKeyPressed(int key) {
         switch (key) {
             case KeyEvent.VK_A:
             case KeyEvent.VK_LEFT:  moveLeft = true;  break;
+
             case KeyEvent.VK_D:
             case KeyEvent.VK_RIGHT: moveRight = true; break;
 
@@ -141,6 +164,7 @@ public class SandboxScene implements Scene {
         switch (key) {
             case KeyEvent.VK_A:
             case KeyEvent.VK_LEFT:  moveLeft = false;  break;
+
             case KeyEvent.VK_D:
             case KeyEvent.VK_RIGHT: moveRight = false; break;
 
@@ -150,8 +174,9 @@ public class SandboxScene implements Scene {
         }
     }
 
-    /** Spawns two angled blades if off cooldown. */
+    /** Player blade firing (F) */
     private void tryFireBlades() {
+        if (player == null) return;
         if (bladeCooldownMs > 0) return;
 
         int muzzleX = state.playerX + state.playerWidth / 2;
@@ -161,39 +186,20 @@ public class SandboxScene implements Scene {
         int vy = -4;
         int size = 10;
 
-        // If you want blade upgrades from Player soon:
-        // int pierce = BLADE_PIERCE + player.bladeExtraPierce();
-        // int bounces = BLADE_BOUNCES + player.bladeExtraBounces();
-        // int dmg = player.bladeDamage(1);
-        // boolean ap = player.upBladeArmorPen;
+        int pierce  = BASE_BLADE_PIERCE  + player.bladeExtraPierce();
+        int bounces = BASE_BLADE_BOUNCES + player.bladeExtraBounces();
+        boolean ap  = player.upBladeArmorPen;
 
-        bullets.add(new Blade(
-                muzzleX, muzzleY,
-                -vx, vy,
-                size,
-                BLADE_BOUNCES,
-                BLADE_PIERCE,
-                bladeLegendarySplit,
-                bladeVerticalBounce,
-                false
-        ));
+        boolean verticalBounce = player.upBladeVerticalBounce;
+        boolean legendarySplit = player.upBladeLegendarySplit;
 
-        bullets.add(new Blade(
-                muzzleX, muzzleY,
-                +vx, vy,
-                size,
-                BLADE_BOUNCES,
-                BLADE_PIERCE,
-                bladeLegendarySplit,
-                bladeVerticalBounce,
-                false
-        ));
+        bullets.add(new Blade(muzzleX, muzzleY, -vx, vy, size, bounces, pierce, legendarySplit, verticalBounce, ap));
+        bullets.add(new Blade(muzzleX, muzzleY, +vx, vy, size, bounces, pierce, legendarySplit, verticalBounce, ap));
 
         bladeCooldownMs = BLADE_COOLDOWN;
 
-        try {
-            AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_blade_fire.wav", 0.25f);
-        } catch (Throwable ignored) {}
+        try { AudioManager.get().playSfx("/spaceinvaders/resources/audio/sfx/wpn_blade_fire.wav", 0.25f); }
+        catch (Throwable ignored) {}
     }
 
     @Override
@@ -201,16 +207,19 @@ public class SandboxScene implements Scene {
         long now = System.currentTimeMillis();
         int dtMs = (int) Math.max(1, Math.round(dtMillis));
 
-        // --- Blade cooldown ---
+        // keep clones in sync with menu every frame
+        syncClonesToUpgrade();
+
+        // Blade cooldown
         if (bladeCooldownMs > 0) bladeCooldownMs -= dtMs;
 
-        // --- Player movement (use player.speedPx) ---
+        // Player movement
         int step = (player != null) ? player.speedPx : 8;
         if (moveLeft)  state.playerX -= step;
         if (moveRight) state.playerX += step;
         state.playerX = Math.max(0, Math.min(state.playerX, state.width - state.playerWidth));
 
-        // --- Fire ---
+        // Player fire
         int muzzleX = state.playerX + state.playerWidth / 2;
         int muzzleY = state.height - state.playerHeight - 10;
 
@@ -218,6 +227,7 @@ public class SandboxScene implements Scene {
             List<Bullet> spawned = fire.tick(now, muzzleX, muzzleY, bullets, state.width, state.height);
 
             if (!spawned.isEmpty()) {
+                // SFX for player weapons (scene-owned)
                 for (Bullet b : spawned) {
                     try {
                         if (b.kind == Bullet.BulletKind.MISSILE) {
@@ -231,7 +241,14 @@ public class SandboxScene implements Scene {
             }
         }
 
-        // --- Bullet movement ---
+        // Clone AI tick (random walk + firing). Controller decides weapons based on player upgrades.
+        int cloneW = state.playerWidth;
+        int cloneH = state.playerHeight;
+        for (SandboxCloneController c : clones) {
+            c.tick(dtMs, state.width, state.height, cloneW, cloneH, player, bullets);
+        }
+
+        // Bullet movement
         List<Bullet> pendingAdds = new ArrayList<>();
 
         for (Iterator<Bullet> it = bullets.iterator(); it.hasNext();) {
@@ -240,7 +257,6 @@ public class SandboxScene implements Scene {
             if (b instanceof Blade blade) {
                 List<Bullet> spawned = blade.updateBlade(dtMs, state.width, state.height);
                 if (spawned != null && !spawned.isEmpty()) pendingAdds.addAll(spawned);
-
                 if (blade.isDead()) it.remove();
                 continue;
             }
@@ -251,7 +267,7 @@ public class SandboxScene implements Scene {
 
         if (!pendingAdds.isEmpty()) bullets.addAll(pendingAdds);
 
-        // --- Invader spawning ---
+        // Invader spawning
         if (now > nextSpawnMs) {
             int x = rng.nextInt(Math.max(1, state.width - 60));
             double roll = rng.nextDouble();
@@ -286,10 +302,9 @@ public class SandboxScene implements Scene {
             nextSpawnMs = now + 610 + rng.nextInt(600);
         }
 
-        // --- Invader movement + cleanup ---
+        // Invader update + cleanup
         for (Iterator<Invader> it = invaders.iterator(); it.hasNext();) {
             Invader inv = it.next();
-
             inv.update(dtMs, state.width, state.height);
 
             if (inv.shieldBreakFlashMs > 0) {
@@ -299,10 +314,13 @@ public class SandboxScene implements Scene {
             if (inv.y > state.height + 50) it.remove();
         }
 
-        // --- Shooter attacks ---
+        // Shooter attacks
         InvaderAttackSystem.spawnShooterBullets(invaders, bullets);
 
-        // --- Collisions (passes player so kills award points) ---
+        // Smart targeting update (affects bullets/missiles with flags set)
+        SmartTargetingSystem.update(bullets, invaders);
+
+        // Collisions
         CollisionSystem.bulletsVsInvaders(bullets, invaders, player, this::spawnShrapnel);
     }
 
@@ -311,14 +329,30 @@ public class SandboxScene implements Scene {
         g.setColor(Color.BLACK);
         g.fillRect(0, 0, width, height);
 
+        // bullets
         for (Bullet b : bullets) {
             spaceinvaders.core.render.BulletRenderers.render(g, b, state);
         }
 
+        // invaders
         for (Invader inv : invaders) {
             spaceinvaders.core.render.InvaderRenderer.render(g, inv, state);
         }
 
+        // clones
+        int cw = state.playerWidth;
+        int ch = state.playerHeight;
+        for (SandboxCloneController c : clones) {
+            int cx = c.getX();
+            int cy = c.getY();
+            if (cloneImg != null) g.drawImage(cloneImg, cx, cy, cw, ch, null);
+            else {
+                g.setColor(new Color(180, 220, 255));
+                g.fillRect(cx, cy, cw, ch);
+            }
+        }
+
+        // player
         Image playerImg = state.playerImage;
         int px = state.playerX;
         int py = height - state.playerHeight - 10;
