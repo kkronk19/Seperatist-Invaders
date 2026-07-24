@@ -15,6 +15,8 @@ import spaceinvaders.features.campaign.UpgradeId;
 import spaceinvaders.core.entities.Blade;
 import spaceinvaders.core.entities.Invader;
 import spaceinvaders.core.entities.HailfireRocket;
+import spaceinvaders.core.entities.MttTransport;
+import spaceinvaders.core.entities.WavyMissile;
 import spaceinvaders.features.campaign.CampaignDefinitions;
 import spaceinvaders.features.campaign.EnemyType;
 import spaceinvaders.services.scores.HighScoreService;
@@ -28,12 +30,21 @@ public final class CampaignSupportTest {
         xp.add(360);
         require(xp.consumeLevelUp(), "first XP level should trigger");
         require(xp.consumeLevelUp(), "overflow should trigger a second level");
-        require(xp.completedLevels() == 2 && xp.xp() == 110, "XP overflow was not retained");
+        require(xp.nextRequirement() == 150 && xp.completedLevels() == 2 && xp.xp() == 172, "XP curve or overflow was not retained");
+        require(new ExperienceProgress().nextRequirement() == 75, "initial XP threshold was not reduced by 25 percent");
 
         RunUpgrades upgrades = new RunUpgrades();
         require(upgrades.apply(UpgradeId.BLASTER_DAMAGE), "first upgrade should apply");
         require(upgrades.apply(UpgradeId.BLASTER_DAMAGE), "stacking upgrade should apply");
         require(upgrades.level(UpgradeId.BLASTER_DAMAGE) == 2, "upgrade level was not stacked");
+        require(upgrades.cardWeight(UpgradeId.MISSILE_DAMAGE) == 1.0, "unfavored path did not start at base weight");
+        upgrades.favor(UpgradeId.MISSILE_LAUNCHER.path());
+        upgrades.favor(UpgradeId.MISSILE_DAMAGE.path());
+        require(upgrades.cardWeight(UpgradeId.MISSILE_DAMAGE) == 1.5, "path affinity was not capped at 1.5x");
+
+        WavyMissile wavy = new WavyMissile(100, 200, -8, 5, 0);
+        wavy.update(); wavy.update(); wavy.update();
+        require(wavy.y < 200 && wavy.x != 100, "base missile lost its smooth wavy flight");
 
         Blade blade = new Blade(-2, 40, -7, -2, 12, 3, 1, false, false, false);
         blade.updateBlade(16, 100, 100);
@@ -48,6 +59,9 @@ public final class CampaignSupportTest {
         require(CampaignDefinitions.mission(2, 1).count(EnemyType.B1) == 35 && CampaignDefinitions.mission(2, 1).count(EnemyType.B2) == 10, "chapter 2 mission 1 composition is wrong");
         require(CampaignDefinitions.mission(2, 2).count(EnemyType.DROIDEKA) == 10 && CampaignDefinitions.mission(2, 2).totalEnemies() == 30, "chapter 2 mission 2 composition is wrong");
         require(CampaignDefinitions.mission(2, 3).count(EnemyType.HAILFIRE) == 5 && CampaignDefinitions.mission(2, 3).count(EnemyType.B1) == 20, "chapter 2 mission 3 composition is wrong");
+        require(CampaignDefinitions.mission(3, 1).count(EnemyType.B1) == 15 && CampaignDefinitions.mission(3, 1).count(EnemyType.HAILFIRE) == 14 && CampaignDefinitions.mission(3, 1).totalEnemies() == 29, "chapter 3 mission 1 composition is wrong");
+        require(CampaignDefinitions.mission(3, 2).count(EnemyType.MTT) == 2 && CampaignDefinitions.mission(3, 2).totalEnemies() == 2, "chapter 3 mission 2 composition is wrong");
+        require(CampaignDefinitions.mission(3, 3).count(EnemyType.MTT) == 2 && CampaignDefinitions.mission(3, 3).count(EnemyType.HAILFIRE) == 10, "chapter 3 mission 3 composition is wrong");
 
         String oldHome = System.getProperty("user.home");
         Path temporaryHome = Files.createTempDirectory("separatist-invaders-test");
@@ -105,6 +119,7 @@ public final class CampaignSupportTest {
         Object upgrades = field(scene, "upgrades");
         upgrades.getClass().getMethod("apply", UpgradeId.class).invoke(upgrades, UpgradeId.NUKE);
         scene.handleKeyPressed(KeyEvent.VK_4);
+        require((double) field(scene, "supportGlobalCooldownMs") == 1000, "support activation did not start the shared one-second cooldown");
         scene.update(1000);
         require(enemies.isEmpty() && (double) field(scene, "nukeCooldown") > 0,
                 "top-row 4 did not activate and detonate Nuke");
@@ -122,7 +137,10 @@ public final class CampaignSupportTest {
         Invader hailfire = (Invader) invoke(numpadScene, "createCampaignEnemy", new Class<?>[] { EnemyType.class, int.class, int.class }, EnemyType.HAILFIRE, 400, 1);
         invoke(numpadScene, "updateHailfireBarrage", new Class<?>[] { Invader.class }, hailfire);
         hailfire.ageMs = 4000;
-        invoke(numpadScene, "updateHailfireBarrage", new Class<?>[] { Invader.class }, hailfire);
+        for (int shot = 0; shot < 8; shot++) {
+            invoke(numpadScene, "updateHailfireBarrage", new Class<?>[] { Invader.class }, hailfire);
+            hailfire.ageMs += 200;
+        }
         long rockets = ((List<Object>) field(numpadScene, "bullets")).stream().filter(HailfireRocket.class::isInstance).count();
         require(rockets >= 4 && rockets <= 8, "Hailfire first barrage was not a 4–8 missile barrage");
 
@@ -136,6 +154,13 @@ public final class CampaignSupportTest {
         require((int) field(bossScene, "health") == beamHealth, "OG-9 warm-up beam dealt damage");
         bossScene.update(1000);
         require((int) field(bossScene, "health") < beamHealth, "OG-9 active beam did not use delta-time damage");
+
+        MttTransport mtt = (MttTransport) invoke(bossScene, "createCampaignEnemy", new Class<?>[] { EnemyType.class, int.class, int.class }, EnemyType.MTT, 300, 500);
+        invoke(bossScene, "updateMtt", new Class<?>[] { MttTransport.class, int.class }, mtt, 256);
+        require(mtt.state == MttTransport.State.DEPLOYMENT_PAUSE, "MTT did not stop at the calculated halfway point");
+        invoke(bossScene, "updateMtt", new Class<?>[] { MttTransport.class, int.class }, mtt, 2000);
+        invoke(bossScene, "updateMtt", new Class<?>[] { MttTransport.class, int.class }, mtt, 3000);
+        require(mtt.deployed == 10, "MTT did not deploy exactly ten B1s");
     }
 
     private static Object field(Object object, String name) throws Exception {

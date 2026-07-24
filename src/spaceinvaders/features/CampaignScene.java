@@ -31,6 +31,8 @@ import spaceinvaders.core.entities.SwarmerZigZagPattern;
 import spaceinvaders.core.entities.TankPattern;
 import spaceinvaders.core.entities.HailfirePattern;
 import spaceinvaders.core.entities.HailfireRocket;
+import spaceinvaders.core.entities.MttTransport;
+import spaceinvaders.core.entities.WavyMissile;
 import spaceinvaders.core.render.BulletRenderers;
 import spaceinvaders.core.render.InvaderRenderer;
 import spaceinvaders.features.campaign.RunUpgrades;
@@ -67,7 +69,8 @@ public final class CampaignScene implements Scene {
     private final List<SupportClone> clones = new ArrayList<>();
     private final EnumMap<UpgradeId, Integer> supportCharges = new EnumMap<>(UpgradeId.class);
     private final Set<Integer> heldSupportKeys = new HashSet<>();
-    private final Map<Invader, Long> hailfireNextBarrage = new HashMap<>();
+    private final Map<Invader, HailfireBarrageState> hailfireBarrages = new HashMap<>();
+    private final List<Invader> pendingEnemyAdds = new ArrayList<>();
 
     private Phase phase;
     private Phase collectionReturn;
@@ -83,6 +86,10 @@ public final class CampaignScene implements Scene {
     private double phaseMs;
     private String announcement;
     private boolean left, right, firing;
+    private enum SelectedWeapon { BLASTER, BLADES, MISSILES }
+    private SelectedWeapon selectedWeapon = SelectedWeapon.BLASTER;
+    private String weaponFeedback = "";
+    private int weaponFeedbackMs;
     private boolean scoreRecorded;
     private boolean emergencySaveUsed;
 
@@ -106,7 +113,8 @@ public final class CampaignScene implements Scene {
     private int cannonLane;
     private double spiderBeamMs, spiderBeamWarmupMs, spiderBeamCooldown, spiderBeamDamageBank, spiderBeamAngle;
     private int bossSupportSpawnIndex;
-    private double cloneReinforcementMs, cloneReinforcementCooldown, orbitalCooldown, airstrikeCooldown, nukeCooldown, supportFlashMs;
+    private double cloneReinforcementCooldown, orbitalCooldown, airstrikeCooldown, nukeCooldown, supportFlashMs;
+    private double supportGlobalCooldownMs;
     private int supportLane;
     private double enemyMotionMs;
     private double nukeActivationMs;
@@ -141,6 +149,7 @@ public final class CampaignScene implements Scene {
         try { state.invaderImageBasic = AssetLoader.imageFromResource("image/b1_droid.png"); } catch (Exception ignored) { }
         try { state.invaderImageB2 = AssetLoader.imageFromResource("image/b2_droid.png"); } catch (Exception ignored) { }
         try { state.invaderImageTank = AssetLoader.imageFromResource("image/aat.png"); } catch (Exception ignored) { }
+        try { state.invaderImageMtt = AssetLoader.imageFromResource("image/mtt.png"); } catch (Exception ignored) { }
         try { state.invaderImageShielded = AssetLoader.imageFromResource("image/droideka.png"); } catch (Exception ignored) { }
         try { state.invaderImageShooter = AssetLoader.imageFromResource("image/bx_commando_droid.png"); } catch (Exception ignored) { }
         try { state.invaderImageSwarmer = AssetLoader.imageFromResource("image/buzz_droid.png"); } catch (Exception ignored) { }
@@ -157,7 +166,7 @@ public final class CampaignScene implements Scene {
         }
         if (phase == Phase.NUKE_SEQUENCE) return;
         if (phase == Phase.CHAPTER_COMPLETE) {
-            if (key == KeyEvent.VK_ENTER || key == KeyEvent.VK_R) startChapterTwo();
+            if (key == KeyEvent.VK_ENTER || key == KeyEvent.VK_R) startNextChapter();
             if (key == KeyEvent.VK_M || key == KeyEvent.VK_ESCAPE) returnToMenu();
             return;
         }
@@ -184,6 +193,9 @@ public final class CampaignScene implements Scene {
             case KeyEvent.VK_A, KeyEvent.VK_LEFT -> left = true;
             case KeyEvent.VK_D, KeyEvent.VK_RIGHT -> right = true;
             case KeyEvent.VK_SPACE -> firing = true;
+            case KeyEvent.VK_Q -> selectedWeapon = SelectedWeapon.BLASTER;
+            case KeyEvent.VK_W -> selectWeapon(SelectedWeapon.BLADES, upgrades.level(UpgradeId.BLADE_UNLOCK) > 0, "BLADES LOCKED");
+            case KeyEvent.VK_E -> selectWeapon(SelectedWeapon.MISSILES, upgrades.level(UpgradeId.MISSILE_LAUNCHER) > 0, "MISSILES LOCKED");
             case KeyEvent.VK_R -> openSupportWheel();
             case KeyEvent.VK_1, KeyEvent.VK_2, KeyEvent.VK_3, KeyEvent.VK_4,
                  KeyEvent.VK_NUMPAD1, KeyEvent.VK_NUMPAD2, KeyEvent.VK_NUMPAD3, KeyEvent.VK_NUMPAD4 -> {
@@ -200,36 +212,64 @@ public final class CampaignScene implements Scene {
         return -1;
     }
 
+    private void selectWeapon(SelectedWeapon weapon, boolean unlocked, String lockedMessage) {
+        if (unlocked) selectedWeapon = weapon;
+        else { weaponFeedback = lockedMessage; weaponFeedbackMs = 900; }
+    }
+
     private void openSupportWheel() {
         phase = Phase.SUPPORT_WHEEL;
     }
 
     private void activateSupport(int slot) {
         UpgradeId id = switch (slot) { case 1 -> UpgradeId.ORBITAL_STRIKE; case 2 -> UpgradeId.AIRSTRIKE; case 3 -> UpgradeId.NUKE; default -> UpgradeId.CLONE_REINFORCEMENTS; };
-        if (upgrades.level(id) == 0 || chargesFor(id) <= 0) return;
-        if (slot == 0 && cloneReinforcementCooldown <= 0) { cloneReinforcementMs = 14000; cloneReinforcementCooldown = 22000; }
+        if (supportGlobalCooldownMs > 0 || !supportUnlocked(id) || chargesFor(id) <= 0) return;
+        if (slot == 0 && cloneReinforcementCooldown <= 0) {
+            int x = findCloneSpawnX();
+            clones.add(new SupportClone(x));
+            cloneReinforcementCooldown = 1;
+        }
         else if (slot == 1 && orbitalCooldown <= 0) { supportLane = state.playerX + state.playerWidth / 2; damageLane(supportLane, 18); supportFlashMs = 450; orbitalCooldown = 12000; }
         else if (slot == 2 && airstrikeCooldown <= 0) { supportLane = state.playerX + state.playerWidth / 2; damageLane(supportLane, 12); supportFlashMs = 800; airstrikeCooldown = 16000; }
         else if (slot == 3 && nukeCooldown <= 0) {
             consumeCharge(id);
             nukeActivationMs = 1000;
             supportFlashMs = 1000;
+            supportGlobalCooldownMs = 1000;
             phase = Phase.NUKE_SEQUENCE;
             debug("nuke activation started; active=" + invaders.size());
             return;
         }
         else return;
         consumeCharge(id);
+        supportGlobalCooldownMs = 1000;
         phase = Phase.RUNNING;
     }
 
     private int chargesFor(UpgradeId id) {
-        if (upgrades.level(id) <= 0) return 0;
+        if (!supportUnlocked(id)) return 0;
         return supportCharges.computeIfAbsent(id, unused -> 3);
+    }
+
+    private boolean supportUnlocked(UpgradeId id) {
+        return id == UpgradeId.CLONE_REINFORCEMENTS ? upgrades.level(UpgradeId.CLONE_SUPPORT_UNLOCK) > 0 : upgrades.level(id) > 0;
     }
 
     private void consumeCharge(UpgradeId id) {
         supportCharges.put(id, Math.max(0, chargesFor(id) - 1));
+    }
+
+    /** Prefer an open backline hardpoint and never overlap the player or a live clone. */
+    private int findCloneSpawnX() {
+        int minimum = 30, maximum = Math.max(minimum, state.width - 70);
+        for (int attempt = 0; attempt < 16; attempt++) {
+            int x = minimum + random.nextInt(Math.max(1, maximum - minimum + 1));
+            if (Math.abs(x - state.playerX) < state.playerWidth + 18) continue;
+            boolean overlaps = false;
+            for (SupportClone clone : clones) if (clone.hp > 0 && Math.abs(x - clone.x) < 46) { overlaps = true; break; }
+            if (!overlaps) return x;
+        }
+        return minimum + random.nextInt(Math.max(1, maximum - minimum + 1));
     }
 
     private void damageLane(int lane, int damage) {
@@ -281,6 +321,7 @@ public final class CampaignScene implements Scene {
             return;
         }
         if (phase == Phase.NUKE_SEQUENCE) {
+            supportGlobalCooldownMs = Math.max(0, supportGlobalCooldownMs - dt);
             nukeActivationMs -= dt;
             if (nukeActivationMs <= 0) executeNuke();
             return;
@@ -292,12 +333,13 @@ public final class CampaignScene implements Scene {
         blasterCooldown = Math.max(0, blasterCooldown - dt);
         missileCooldown = Math.max(0, missileCooldown - dt);
         bladeCooldown = Math.max(0, bladeCooldown - dt);
-        cloneReinforcementMs = Math.max(0, cloneReinforcementMs - dt);
         cloneReinforcementCooldown = Math.max(0, cloneReinforcementCooldown - dt);
         orbitalCooldown = Math.max(0, orbitalCooldown - dt);
         airstrikeCooldown = Math.max(0, airstrikeCooldown - dt);
         nukeCooldown = Math.max(0, nukeCooldown - dt);
         supportFlashMs = Math.max(0, supportFlashMs - dt);
+        supportGlobalCooldownMs = Math.max(0, supportGlobalCooldownMs - dt);
+        weaponFeedbackMs = Math.max(0, weaponFeedbackMs - dt);
         updatePlayer(dt);
         updateMissionSchedule(dt);
         updateWeapons();
@@ -363,12 +405,13 @@ public final class CampaignScene implements Scene {
             case B2 -> configure(new Invader(x, y, 58, 58, Invader.InvaderKind.B2, null), 6, 1, 30);
             case DROIDEKA -> configure(new Invader(x, y, 62, 62, Invader.InvaderKind.SHIELDED, null), 3, 1, 30);
             case HAILFIRE -> configure(new Invader(x, y, 90, 70, Invader.InvaderKind.HAILFIRE, new HailfirePattern(x)), 10, 1, 70);
+            case MTT -> new MttTransport(x, y);
         };
     }
 
     private void updateWeapons() {
         if (!firing) return;
-        if (blasterCooldown <= 0) {
+        if (selectedWeapon == SelectedWeapon.BLASTER && blasterCooldown <= 0) {
             int damage = 1 + upgrades.level(UpgradeId.BLASTER_DAMAGE);
             int speed = 9 + upgrades.level(UpgradeId.BOLT_SPEED) * 2;
             int count = 1 + upgrades.level(UpgradeId.MULTI_SHOT);
@@ -380,18 +423,22 @@ public final class CampaignScene implements Scene {
             }
             blasterCooldown = Math.max(180, 390 - upgrades.level(UpgradeId.FIRE_RATE) * 45);
         }
-        if (upgrades.level(UpgradeId.MISSILE_LAUNCHER) > 0 && missileCooldown <= 0) {
+        if (selectedWeapon == SelectedWeapon.MISSILES && upgrades.level(UpgradeId.MISSILE_LAUNCHER) > 0 && missileCooldown <= 0) {
             int count = 1 + upgrades.level(UpgradeId.MISSILE_COUNT);
             for (int i = 0; i < count; i++) tryFireMissile(i - (count - 1) / 2);
         }
-        if (upgrades.level(UpgradeId.BLADE_UNLOCK) > 0 && bladeCooldown <= 0) tryFireBlade();
+        if (selectedWeapon == SelectedWeapon.BLADES && upgrades.level(UpgradeId.BLADE_UNLOCK) > 0 && bladeCooldown <= 0) tryFireBlade();
     }
 
     private void tryFireMissile(int laneOffset) {
         if (missileCooldown > 0) return;
         int damage = 5 + upgrades.level(UpgradeId.MISSILE_DAMAGE) * 2;
         int speed = 8 + upgrades.level(UpgradeId.MISSILE_SPEED) * 2;
-        bullets.add(new Missile(state.playerX + state.playerWidth / 2 - 7 + laneOffset * 18, playerY() - 10, laneOffset * 2, -speed, 14, damage));
+        int count = 1 + upgrades.level(UpgradeId.MISSILE_COUNT);
+        int center = state.playerX + state.playerWidth / 2 - 7;
+        int x = count == 1 ? center : count == 2 ? center + (laneOffset < 0 ? -22 : 22) : center + laneOffset * 30;
+        double phase = count == 1 ? 0 : count == 2 ? (laneOffset < 0 ? 0 : Math.PI) : (laneOffset < 0 ? 0 : laneOffset == 0 ? Math.PI / 2 : Math.PI);
+        bullets.add(new WavyMissile(x, playerY() - 10, -speed, damage, phase));
         missileCooldown = Math.max(700, 1700 - upgrades.level(UpgradeId.MISSILE_COOLDOWN) * 200);
     }
 
@@ -468,7 +515,8 @@ public final class CampaignScene implements Scene {
         Rectangle player = playerBounds();
         for (Iterator<Invader> it = invaders.iterator(); it.hasNext();) {
             Invader enemy = it.next();
-            enemy.update(movementDt, state.width, state.height);
+            if (enemy instanceof MttTransport mtt) updateMtt(mtt, movementDt);
+            else enemy.update(movementDt, state.width, state.height);
             if (enemy.kind == Invader.InvaderKind.SHOOTER && enemy.firePending) {
                 enemy.firePending = false;
                 fireEnemy(enemy.x + enemy.width / 2, enemy.y + enemy.height, 0, 6 + wave, 1);
@@ -485,41 +533,64 @@ public final class CampaignScene implements Scene {
                 damagePlayer(Math.max(0, 2 - upgrades.level(UpgradeId.REINFORCED_BARRIER) - upgrades.level(UpgradeId.DEFENSIVE_LINE_INTEGRITY) / 2 - upgrades.level(UpgradeId.AUTO_REPAIR) / 2));
             }
         }
+        if (!pendingEnemyAdds.isEmpty()) { invaders.addAll(pendingEnemyAdds); pendingEnemyAdds.clear(); }
         if (!deferredBullets.isEmpty()) { bullets.addAll(deferredBullets); deferredBullets.clear(); }
+    }
+
+    private void updateMtt(MttTransport mtt, int dt) {
+        mtt.ageMs += dt;
+        int halfway = defensiveLine() / 2;
+        if (mtt.state == MttTransport.State.DESCENDING || mtt.state == MttTransport.State.DESCENDING_AFTER_DEPLOYMENT) {
+            mtt.verticalMs += dt;
+            if (mtt.verticalMs >= 256) { mtt.y++; mtt.verticalMs = 0; } // heavier/slower than the AAT
+            if (mtt.state == MttTransport.State.DESCENDING && mtt.y >= halfway) { mtt.state = MttTransport.State.DEPLOYMENT_PAUSE; mtt.stateMs = 2000; }
+            if (mtt.y >= 0) fireMttIfReady(mtt);
+            return;
+        }
+        mtt.stateMs -= dt;
+        if (mtt.state == MttTransport.State.DEPLOYMENT_PAUSE && mtt.stateMs <= 0) { mtt.state = MttTransport.State.DEPLOYING; mtt.stateMs = 3000; }
+        if (mtt.state == MttTransport.State.DEPLOYING) {
+            int targetDeployed = Math.min(10, (int) Math.ceil((3000 - Math.max(0, mtt.stateMs)) / 300.0));
+            while (mtt.deployed < targetDeployed) {
+                int lane = mtt.deployed++;
+                pendingEnemyAdds.add(createCampaignEnemy(EnemyType.B1, mtt.x + 12 + (lane % 5) * 26, mtt.y - 30 - (lane / 5) * 18));
+            }
+            if (mtt.stateMs <= 0) { mtt.state = MttTransport.State.DESCENDING_AFTER_DEPLOYMENT; mtt.stateMs = 0; }
+        }
+    }
+
+    private void fireMttIfReady(MttTransport mtt) {
+        if (mtt.ageMs < mtt.nextVolleyAtMs) return;
+        bullets.add(new EnemyBullet(mtt.x + 28, mtt.y + mtt.height - 6, -1, 6, 10, 4));
+        bullets.add(new EnemyBullet(mtt.x + mtt.width - 38, mtt.y + mtt.height - 6, 1, 6, 10, 4));
+        mtt.nextVolleyAtMs = mtt.ageMs + 5000 + Math.floorMod(mtt.x + (int) mtt.ageMs, 10001);
     }
 
     private void updateHailfireBarrage(Invader hailfire) {
         if (hailfire.y < 0) return;
-        Long due = hailfireNextBarrage.get(hailfire);
-        if (due == null) {
-            due = hailfire.ageMs + 1000 + Math.floorMod(hailfire.spawnX, 2001);
-            hailfireNextBarrage.put(hailfire, due);
-            debug("hailfire entered; first barrage at=" + due);
-        }
-        if (hailfire.ageMs < due) return;
-        int count = 4 + Math.floorMod(hailfire.spawnX + (int) (hailfire.ageMs / 1000), 5);
-        for (int i = 0; i < count; i++) {
-            int offset = -hailfire.width / 3 + i * (hailfire.width * 2 / 3) / Math.max(1, count - 1);
-            int vx = (i % 3) - 1;
-            bullets.add(new HailfireRocket(hailfire.x + hailfire.width / 2 + offset, hailfire.y + hailfire.height, vx, 6 + (i % 2), i * 0.9));
-        }
-        long next = hailfire.ageMs + 10000 + Math.floorMod(hailfire.spawnX + count, 2001);
-        hailfireNextBarrage.put(hailfire, next);
-        debug("hailfire barrage count=" + count + " hostileProjectiles=" + bullets.size() + " next=" + next);
+        HailfireBarrageState state = hailfireBarrages.get(hailfire);
+        if (state == null) { state = new HailfireBarrageState(hailfire.ageMs + 1000 + Math.floorMod(hailfire.spawnX, 2001)); hailfireBarrages.put(hailfire, state); }
+        if (!state.firing && hailfire.ageMs >= state.nextBarrageMs) { state.firing = true; state.total = state.remaining = 4 + Math.floorMod(hailfire.spawnX + (int)(hailfire.ageMs / 1000), 5); state.nextShotMs = hailfire.ageMs; }
+        if (!state.firing || hailfire.ageMs < state.nextShotMs) return;
+        int shot = state.total - state.remaining;
+        int offset = -hailfire.width / 3 + (shot % 5) * (hailfire.width / 6);
+        long seed = ((long) hailfire.spawnX << 32) ^ (hailfire.ageMs << 12) ^ shot;
+        int targetX = 100 + Math.floorMod((int) (seed * 37), Math.max(1, this.state.width - 200));
+        int targetY = defensiveLine() - 30 - Math.floorMod((int) (seed * 11), 180);
+        bullets.add(new HailfireRocket(hailfire.x + hailfire.width / 2 + offset, hailfire.y + hailfire.height, targetX, targetY, seed));
+        state.remaining--; state.nextShotMs = hailfire.ageMs + 200;
+        if (state.remaining == 0) { state.firing = false; state.nextBarrageMs = hailfire.ageMs + 10000 + Math.floorMod(hailfire.spawnX + state.total, 2001); }
+    }
+
+    private static final class HailfireBarrageState {
+        long nextBarrageMs, nextShotMs; int total, remaining; boolean firing;
+        HailfireBarrageState(long next) { nextBarrageMs = next; }
     }
 
     private void updateClones(int dt) {
-        int desired = upgrades.level(UpgradeId.CLONE_SUPPORT_UNLOCK) == 0 ? 0 : 1 + upgrades.level(UpgradeId.ADDITIONAL_CLONE);
-        if (cloneReinforcementMs > 0) desired = Math.min(3, desired + 1);
-        while (clones.size() < desired) clones.add(new SupportClone(160 + clones.size() * 150));
-        while (clones.size() > desired) clones.remove(clones.size() - 1);
-        for (SupportClone clone : clones) {
-            if (clone.hp <= 0) {
-                if (upgrades.level(UpgradeId.CLONE_REVIVAL) == 0) continue;
-                clone.reviveMs -= dt;
-                if (clone.reviveMs <= 0) clone.hp = clone.maxHealth();
-                continue;
-            }
+        for (Iterator<SupportClone> it = clones.iterator(); it.hasNext();) {
+            SupportClone clone = it.next();
+            if (clone.hp <= 0) { it.remove(); continue; }
             clone.x += clone.direction * 2;
             if (clone.x < 30 || clone.x > state.width - 70) clone.direction *= -1;
             clone.cooldown -= dt;
@@ -623,7 +694,6 @@ public final class CampaignScene implements Scene {
                 if (clone != null) {
                     it.remove();
                     clone.hp -= Math.max(1, bullet.damage - upgrades.level(UpgradeId.CLONE_ARMOR));
-                    if (clone.hp <= 0) clone.reviveMs = 6000;
                 } else if (hitbox.intersects(player)) { it.remove(); damagePlayer(bullet.damage); }
                 continue;
             }
@@ -673,6 +743,7 @@ public final class CampaignScene implements Scene {
             case BASIC -> 1;
             case B2, SHIELDED, SHOOTER -> 3;
             case TANK, HAILFIRE -> 8;
+            case MTT -> 20;
             default -> 1;
         };
     }
@@ -705,6 +776,12 @@ public final class CampaignScene implements Scene {
         missionElapsedMs = 0;
         invaders.clear();
         phase = Phase.RUNNING;
+        if (upgrades.level(UpgradeId.CLONE_SUPPORT_UNLOCK) > 0) {
+            supportCharges.merge(UpgradeId.CLONE_REINFORCEMENTS, 1 + upgrades.level(UpgradeId.ADDITIONAL_CLONE), Integer::sum);
+            if (upgrades.level(UpgradeId.CLONE_REVIVAL) > 0) {
+                for (SupportClone clone : clones) if (clone.hp > 0) clone.hp = Math.min(clone.maxHealth(), clone.hp + 3);
+            }
+        }
         debug("mission initialized chapter=" + chapter + " mission=" + wave + " events=" + activeMission.spawns().size());
         updateMissionSchedule(0); // only the explicit time-zero group is due
     }
@@ -765,10 +842,16 @@ public final class CampaignScene implements Scene {
 
     private void finishStage() {
         pendingStage = wave + 1;
+        if (chapter == 3 && wave == 3) pendingComplete = true;
         transitionPending = true;
         activeMission = null;
         debug("mission complete chapter=" + chapter + " mission=" + wave + " next=" + pendingStage);
         int reward = 35 + wave * 20;
+        if (chapter == 3 && wave == 3) {
+            transitionPending = false;
+            if (!grantXp(reward)) completeAfterUpgrades();
+            return;
+        }
         // Keep an already-visible card set intact. Its completion will consume any
         // additional overflow and then begin this queued stage.
         if (phase == Phase.UPGRADE) {
@@ -799,15 +882,26 @@ public final class CampaignScene implements Scene {
     private void rollCards() {
         cards.clear();
         List<UpgradeId> available = upgrades.available();
-        while (cards.size() < 3 && !available.isEmpty()) cards.add(available.remove(random.nextInt(available.size())));
+        while (cards.size() < 3 && !available.isEmpty()) {
+            double total = 0;
+            for (UpgradeId id : available) total += upgrades.cardWeight(id);
+            double roll = random.nextDouble() * total;
+            UpgradeId picked = available.get(available.size() - 1);
+            for (UpgradeId id : available) { roll -= upgrades.cardWeight(id); if (roll <= 0) { picked = id; break; } }
+            cards.add(picked);
+            available.remove(picked);
+        }
     }
 
     private void chooseCard(int index) {
         if (index < 0 || index >= cards.size()) return;
         UpgradeId chosen = cards.get(index);
         if (!upgrades.apply(chosen)) return;
+        upgrades.favor(chosen.path());
         debug("upgrade selected " + chosen + " transitionPending=" + transitionPending + " chapter=" + chapter + " mission=" + wave);
         if (chosen == UpgradeId.MAX_HEALTH) { maxHealth += 3; health = Math.min(maxHealth, health + 3); }
+        if (chosen == UpgradeId.CLONE_SUPPORT_UNLOCK) supportCharges.put(UpgradeId.CLONE_REINFORCEMENTS, 1);
+        if (chosen == UpgradeId.CLONE_HEALTH) for (SupportClone clone : clones) if (clone.hp > 0) clone.hp += 5;
         if (experience.consumeLevelUp()) { rollCards(); return; }
         if (pendingComplete) completeAfterUpgrades();
         else if (transitionPending) startTransition();
@@ -823,7 +917,7 @@ public final class CampaignScene implements Scene {
 
     private void completeAfterUpgrades() {
         pendingComplete = false;
-        if (chapter == 1) phase = Phase.CHAPTER_COMPLETE; else endRun(true);
+        if (chapter < 3) phase = Phase.CHAPTER_COMPLETE; else endRun(true);
     }
 
     private void debug(String message) {
@@ -832,6 +926,16 @@ public final class CampaignScene implements Scene {
 
     private void startChapterTwo() {
         chapter = 2; wave = 1; pendingStage = 1; announcement = "CHAPTER 2 — GEONOSIS"; phaseMs = 2200; phase = Phase.ANNOUNCEMENT;
+    }
+
+    private void startNextChapter() {
+        if (chapter == 1) { startChapterTwo(); return; }
+        chapter = 3;
+        wave = 1;
+        pendingStage = 1;
+        announcement = "CHAPTER 3 — END OF GEONOSIS";
+        phaseMs = 2200;
+        phase = Phase.ANNOUNCEMENT;
     }
 
     private void endRun(boolean won) {
@@ -867,9 +971,9 @@ public final class CampaignScene implements Scene {
             case COLLECTION -> drawCollection(g);
             case UPGRADE -> drawUpgradeCards(g);
             case SUPPORT_WHEEL -> drawSupportWheel(g);
-            case CHAPTER_COMPLETE -> drawCenteredMessage(g, "CHAPTER ONE COMPLETE", "Enter/R: deploy to Chapter 2    M/Esc: main menu", new Color(130, 255, 170));
+            case CHAPTER_COMPLETE -> drawCenteredMessage(g, "CHAPTER " + chapter + " COMPLETE", "Enter/R: continue to Chapter " + (chapter + 1) + "    M/Esc: main menu", new Color(130, 255, 170));
             case GAME_OVER -> drawCenteredMessage(g, "MISSION FAILED", "Enter/R: retry    M/Esc: main menu", new Color(255, 110, 110));
-            case COMPLETE -> drawCenteredMessage(g, "CHAPTER ONE COMPLETE", "Enter/R: replay    M/Esc: main menu", new Color(130, 255, 170));
+            case COMPLETE -> drawCenteredMessage(g, "CHAPTER 3 COMPLETE", "Enter/R: replay    M/Esc: main menu", new Color(130, 255, 170));
             default -> { }
         }
     }
@@ -893,9 +997,16 @@ public final class CampaignScene implements Scene {
     private void renderBullet(Graphics2D g, Bullet bullet) {
         if (bullet instanceof EnemyBullet) {
             if (bullet instanceof HailfireRocket) {
-                g.setColor(new Color(100, 45, 165, 130));
-                g.fillOval(bullet.x - 5, bullet.y + 5, bullet.size + 10, bullet.size + 10);
-                g.setColor(Color.BLACK);
+                HailfireRocket rocket = (HailfireRocket) bullet;
+                int alpha = 150;
+                for (int[] point : rocket.trail) { g.setColor(new Color(138, 68, 225, Math.max(12, alpha))); g.fillOval(point[0] - 2, point[1] - 2, 4, 4); alpha -= 3; }
+                java.awt.geom.AffineTransform old = g.getTransform();
+                g.translate(rocket.x + rocket.size / 2.0, rocket.y + rocket.size / 2.0);
+                g.rotate(Math.atan2(rocket.vy, rocket.vx));
+                g.setColor(Color.BLACK); g.fillPolygon(new int[] { 8, -7, -4, -7 }, new int[] { 0, -4, 0, 4 }, 4);
+                g.setColor(new Color(70, 70, 82)); g.fillRect(-5, -2, 8, 4);
+                g.setTransform(old);
+                return;
             } else g.setColor(bullet.damage >= 4 ? new Color(255, 130, 50) : new Color(255, 70, 70));
             g.fillOval(bullet.x, bullet.y, bullet.size, bullet.size);
         } else BulletRenderers.render(g, bullet, state);
@@ -914,6 +1025,9 @@ public final class CampaignScene implements Scene {
         for (SupportClone clone : clones) {
             if (image != null) g.drawImage(image, clone.x, clone.y(), 36, 48, null);
             else { g.setColor(new Color(110, 210, 255)); g.fillRect(clone.x, clone.y(), 36, 48); }
+            int barW = 38;
+            g.setColor(Color.DARK_GRAY); g.fillRect(clone.x - 1, clone.y() - 10, barW, 5);
+            g.setColor(new Color(90, 220, 120)); g.fillRect(clone.x - 1, clone.y() - 10, barW * Math.max(0, clone.hp) / clone.maxHealth(), 5);
             g.setColor(Color.WHITE); g.drawString("SUPPORT", clone.x - 5, clone.y() - 5);
         }
     }
@@ -925,8 +1039,15 @@ public final class CampaignScene implements Scene {
         g.drawString("SCORE " + score, state.width - 230, 46);
         g.drawString(boss == null ? "CH " + chapter + "  MISSION " + wave : (chapter == 1 ? "AAT TANK" : "OG-9 SPIDER"), state.width - 300, 76);
         if (boss != null) drawBar(g, state.width / 2 - 360, 24, 720, 22, Math.max(0, boss.hp), bossMaxHealth, new Color(230, 165, 50), chapter == 1 ? "AAT TANK" : "OG-9 HOMING SPIDER DROID");
-        g.setFont(new Font("SansSerif", Font.PLAIN, 16)); g.setColor(new Color(210, 225, 245));
-        g.drawString("A/D move   Space: all unlocked weapons   R: weapons & support info   P pause   U upgrades", 30, state.height - 18);
+        g.setFont(new Font("SansSerif", Font.BOLD, 16)); g.setColor(new Color(155, 220, 255));
+        g.drawString("WEAPON: " + selectedWeapon, 410, 45);
+        g.setFont(new Font("SansSerif", Font.PLAIN, 15));
+        g.setColor(upgrades.level(UpgradeId.BLADE_UNLOCK) > 0 ? Color.WHITE : new Color(105, 105, 115));
+        g.drawString("Q Blaster   W Blades" + (upgrades.level(UpgradeId.BLADE_UNLOCK) > 0 ? "" : " (locked)") + "   E Missiles" + (upgrades.level(UpgradeId.MISSILE_LAUNCHER) > 0 ? "" : " (locked)"), 410, 68);
+        g.setColor(new Color(210, 225, 245));
+        g.drawString("A/D move   Space: selected weapon   1-4 support   R info   P pause   U upgrades", 30, state.height - 18);
+        if (weaponFeedbackMs > 0) { g.setColor(new Color(255, 190, 100)); g.drawString(weaponFeedback, state.width / 2 - 55, 104); }
+        if (supportGlobalCooldownMs > 0) { g.setColor(new Color(255, 210, 110)); g.drawString("SUPPORT COOLDOWN " + String.format("%.1fs", supportGlobalCooldownMs / 1000.0), state.width / 2 - 85, 126); }
         drawSupportHotbar(g);
     }
 
@@ -935,11 +1056,12 @@ public final class CampaignScene implements Scene {
         String[] names = { "CLONES", "ORBITAL", "AIRSTRIKE", "NUKE" };
         int x = state.width / 2 - 360;
         for (int i = 0; i < ids.length; i++) {
-            boolean unlocked = upgrades.level(ids[i]) > 0;
+            boolean unlocked = supportUnlocked(ids[i]);
             int charges = unlocked ? chargesFor(ids[i]) : 0;
-            g.setColor(unlocked && charges > 0 ? new Color(35, 75, 112, 220) : new Color(25, 25, 30, 220));
+            boolean cooling = supportGlobalCooldownMs > 0;
+            g.setColor(unlocked && charges > 0 && !cooling ? new Color(35, 75, 112, 220) : new Color(25, 25, 30, 220));
             g.fillRoundRect(x + i * 185, state.height - 90, 170, 48, 10, 10);
-            g.setColor(unlocked ? Color.WHITE : new Color(110, 110, 110));
+            g.setColor(unlocked && !cooling ? Color.WHITE : new Color(110, 110, 110));
             g.drawRoundRect(x + i * 185, state.height - 90, 170, 48, 10, 10);
             g.setFont(new Font("SansSerif", Font.BOLD, 14));
             g.drawString((i + 1) + " " + (unlocked ? names[i] : "LOCKED"), x + 10 + i * 185, state.height - 68);
@@ -986,8 +1108,9 @@ public final class CampaignScene implements Scene {
             int x = 180 + i * 530, y = 270, w = 450, h = 330;
             g.setColor(new Color(13, 25, 50, 245)); g.fillRoundRect(x, y, w, h, 18, 18);
             g.setColor(new Color(100, 185, 255)); g.setStroke(new BasicStroke(3)); g.drawRoundRect(x, y, w, h, 18, 18);
-            g.setColor(Color.WHITE); g.setFont(new Font("SansSerif", Font.BOLD, 28)); g.drawString((i + 1) + ". " + id.title(), x + 24, y + 58);
-            g.setFont(new Font("SansSerif", Font.PLAIN, 20)); drawWrapped(g, id.description(), x + 24, y + 105, w - 48, 28);
+            g.setColor(new Color(135, 205, 255)); g.setFont(new Font("SansSerif", Font.BOLD, 16)); g.drawString("PATH: " + id.path().name().replace('_', ' '), x + 24, y + 32);
+            g.setColor(Color.WHITE); g.setFont(new Font("SansSerif", Font.BOLD, 28)); g.drawString((i + 1) + ". " + id.title(), x + 24, y + 70);
+            g.setFont(new Font("SansSerif", Font.PLAIN, 20)); drawWrapped(g, id.description(), x + 24, y + 117, w - 48, 28);
             g.setColor(new Color(255, 220, 120)); g.drawString(upgrades.level(id) == 0 ? "NEW" : "LEVEL " + upgrades.level(id) + " → " + (upgrades.level(id) + 1), x + 24, y + h - 34);
         }
     }
@@ -1003,7 +1126,7 @@ public final class CampaignScene implements Scene {
         UpgradeId[] ids = { UpgradeId.CLONE_REINFORCEMENTS, UpgradeId.ORBITAL_STRIKE, UpgradeId.AIRSTRIKE, UpgradeId.NUKE };
         for (int i = 0; i < names.length; i++) {
             int x = i < 2 ? 350 : 1040, y = i % 2 == 0 ? 300 : 470;
-            boolean unlocked = upgrades.level(ids[i]) > 0;
+            boolean unlocked = supportUnlocked(ids[i]);
             g.setColor(unlocked ? new Color(45, 82, 120) : new Color(40, 40, 45)); g.fillRoundRect(x, y, 520, 105, 16, 16);
             g.setColor(Color.WHITE); g.setFont(new Font("SansSerif", Font.BOLD, 21)); g.drawString(unlocked ? names[i] : (i + 1) + ". ???", x + 24, y + 40);
             g.setFont(new Font("SansSerif", Font.PLAIN, 16)); g.drawString(unlocked ? ids[i].description() + "  Key " + (i + 1) + "  x" + chargesFor(ids[i]) : ids[i].hint(), x + 24, y + 75);
@@ -1020,6 +1143,8 @@ public final class CampaignScene implements Scene {
             boolean unlocked = upgrades.level(id) > 0;
             g.setColor(unlocked ? new Color(20, 55, 85) : new Color(25, 25, 32)); g.fillRoundRect(x, y, 760, 100, 12, 12);
             g.setColor(unlocked ? new Color(100, 210, 255) : new Color(80, 80, 88)); g.drawRoundRect(x, y, 760, 100, 12, 12);
+            g.setFont(new Font("SansSerif", Font.BOLD, 15)); g.setColor(unlocked ? new Color(135, 205, 255) : new Color(155, 155, 165));
+            if (unlocked) g.drawString("PATH: " + id.path().name().replace('_', ' '), x + 18, y + 20);
             g.setFont(new Font("SansSerif", Font.BOLD, 19)); g.setColor(unlocked ? Color.WHITE : new Color(155, 155, 165));
             g.drawString(unlocked ? id.title() + " — Level " + upgrades.level(id) + "/" + id.maxLevel() : "???", x + 18, y + 30);
             g.setFont(new Font("SansSerif", Font.PLAIN, 16)); drawWrapped(g, unlocked ? id.description() : id.hint(), x + 18, y + 58, 720, 21);
@@ -1041,9 +1166,9 @@ public final class CampaignScene implements Scene {
     }
 
     private final class SupportClone {
-        int x, direction = 1, hp, reviveMs; double cooldown;
+        int x, direction = 1, hp; double cooldown;
         SupportClone(int x) { this.x = x; this.hp = maxHealth(); }
-        int maxHealth() { return 5 + upgrades.level(UpgradeId.CLONE_HEALTH) * 3; }
-        int y() { return playerY() + 10; }
+        int maxHealth() { return 15 + upgrades.level(UpgradeId.CLONE_HEALTH) * 5; }
+        int y() { return defensiveLine() - 70; }
     }
 }

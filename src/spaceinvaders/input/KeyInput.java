@@ -16,6 +16,9 @@ public final class KeyInput {
 
         bind(im, am, "LEFT",  KeyEvent.VK_LEFT, scenes);
         bind(im, am, "A",     KeyEvent.VK_A,    scenes);
+        bind(im, am, "Q",     KeyEvent.VK_Q,    scenes);
+        bind(im, am, "W",     KeyEvent.VK_W,    scenes);
+        bind(im, am, "E",     KeyEvent.VK_E,    scenes);
         bind(im, am, "RIGHT", KeyEvent.VK_RIGHT,scenes);
         bind(im, am, "D",     KeyEvent.VK_D,    scenes);
         bind(im, am, "SPACE", KeyEvent.VK_SPACE,scenes);

@@ -13,6 +13,9 @@ public final class CampaignDefinitions {
             case "2:1" -> d(2, 1, e(0, EnemyType.B2, 5, "frontline"), e(2000, EnemyType.B1, 5, "line"), e(4000, EnemyType.B1, 5, "stagger"), e(6000, EnemyType.B2, 5, "frontline"), e(8000, EnemyType.B1, 5, "v"), e(10000, EnemyType.B1, 5, "alternate"), e(12000, EnemyType.B1, 5, "line"), e(14000, EnemyType.B1, 5, "stagger"), e(16000, EnemyType.B1, 5, "line"));
             case "2:2" -> d(2, 2, e(0, EnemyType.B1, 5, "line"), e(3000, EnemyType.DROIDEKA, 5, "frontline"), e(6000, EnemyType.B1, 5, "stagger"), e(9000, EnemyType.B2, 5, "frontline"), e(12000, EnemyType.DROIDEKA, 5, "line"), e(15000, EnemyType.B1, 5, "v"));
             case "2:3" -> d(2, 3, e(0, EnemyType.B1, 5, "line"), e(3000, EnemyType.HAILFIRE, 1, "left"), e(5000, EnemyType.B1, 5, "stagger"), e(8000, EnemyType.HAILFIRE, 2, "alternate"), e(10000, EnemyType.B1, 5, "line"), e(13000, EnemyType.HAILFIRE, 2, "alternate"), e(15000, EnemyType.B1, 5, "v"));
+            case "3:1" -> d(3, 1, e(0, EnemyType.B1, 5, "line"), e(0, EnemyType.HAILFIRE, 2, "alternate"), e(1000, EnemyType.B1, 5, "stagger"), e(1000, EnemyType.HAILFIRE, 2, "alternate"), e(2000, EnemyType.B1, 5, "v"), e(2000, EnemyType.HAILFIRE, 3, "alternate"), e(7000, EnemyType.HAILFIRE, 7, "line"));
+            case "3:2" -> d(3, 2, e(0, EnemyType.MTT, 2, "pair"));
+            case "3:3" -> d(3, 3, e(0, EnemyType.MTT, 2, "pair"), e(3000, EnemyType.HAILFIRE, 10, "line"));
             default -> throw new IllegalArgumentException("Unknown campaign mission " + chapter + ":" + mission);
         };
     }

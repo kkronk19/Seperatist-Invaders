@@ -39,6 +39,7 @@ public class GameState {
     public Image invaderImageBasic;     // b1_droid.png
     public Image invaderImageB2;        // b2_droid.png
     public Image invaderImageTank;      // aat.png
+    public Image invaderImageMtt;       // mtt.png
     public Image invaderImageShielded;  // droideka.png
     public Image invaderImageShooter;   // bx_commando_droid.png
     public Image invaderImageSwarmer;   // buzz_droid.png
