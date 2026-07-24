@@ -115,6 +115,6 @@ public class Invader {
         return y > panelH;
     }
 
-    public enum InvaderKind { BASIC, SHIELDED, TANK, SWARMER, SHOOTER, BOSS_01, BOSS_02, BOSS_03, FINAL_BOSS }
+    public enum InvaderKind { BASIC, B2, SHIELDED, TANK, HAILFIRE, SWARMER, SHOOTER, BOSS_01, BOSS_02, BOSS_03, FINAL_BOSS }
     public enum LootKind { NONE, AMMO, UPGRADE, HEALTH, MISSILE, DISC }
 }

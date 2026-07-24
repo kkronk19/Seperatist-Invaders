@@ -6,7 +6,10 @@ import spaceinvaders.core.GameState;
 import spaceinvaders.ui.view.GamePanel;
 import spaceinvaders.core.SceneManager;
 import spaceinvaders.features.SandboxScene;
+import spaceinvaders.features.CampaignScene;
 import spaceinvaders.services.audio.AudioManager;
+import spaceinvaders.services.scores.HighScoreEntry;
+import spaceinvaders.services.scores.HighScoreService;
 
 public class StartMenuPanel extends JPanel {
 
@@ -33,17 +36,24 @@ public class StartMenuPanel extends JPanel {
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // --- Buttons ---
-        JButton play    = makeButton("Play",    new Color(100, 180, 255), Color.BLACK);
+        JButton play    = makeButton("Start Campaign", new Color(100, 180, 255), Color.BLACK);
+        JButton scores  = makeButton("High Scores", new Color(100, 180, 255), Color.BLACK);
+        JButton controls = makeButton("Controls", new Color(100, 180, 255), Color.BLACK);
         JButton sandbox = makeButton("Sandbox", new Color(100, 180, 255), Color.BLACK);
         JButton quit    = makeButton("Quit",    new Color(100, 180, 255), Color.BLACK);
 
         // --- Actions ---
         play.addActionListener(e -> {
             try { AudioManager.get().stopLoop("menu"); } catch (Throwable ignored) {}
-            state.mode = GameState.AppMode.PLAY;
+            scenes.set(new CampaignScene(state, scenes));
             setVisible(false);
             panel.requestFocusInWindow();
         });
+
+        scores.addActionListener(e -> showHighScores());
+        controls.addActionListener(e -> JOptionPane.showMessageDialog(this,
+                "Campaign controls\n\nA/D or arrows — move\nSpace — blaster\nR — missile\nF — blades\nP/Esc — pause\nU — upgrade collection\n1/2/3 — select an upgrade card",
+                "Controls", JOptionPane.INFORMATION_MESSAGE));
 
         sandbox.addActionListener(e -> {
             scenes.set(new SandboxScene(state, scenes));
@@ -60,6 +70,10 @@ public class StartMenuPanel extends JPanel {
         box.add(Box.createVerticalStrut(50));
         box.add(play);
         box.add(Box.createVerticalStrut(15));
+        box.add(scores);
+        box.add(Box.createVerticalStrut(15));
+        box.add(controls);
+        box.add(Box.createVerticalStrut(15));
         box.add(sandbox);
         box.add(Box.createVerticalStrut(15));
         box.add(quit);
@@ -72,6 +86,21 @@ public class StartMenuPanel extends JPanel {
                 resizeLogo();
             }
         });
+    }
+
+    private void showHighScores() {
+        HighScoreService service = new HighScoreService();
+        StringBuilder text = new StringBuilder("CHAPTER ONE HIGH SCORES\n\n");
+        int rank = 1;
+        for (HighScoreEntry entry : service.load()) {
+            text.append(String.format("%2d. %6d   %s   %s%n", rank++, entry.score(), entry.date(), entry.mode()));
+        }
+        if (rank == 1) text.append("No scores recorded yet. Defend the Republic!");
+        text.append("\nSaved locally: ").append(service.location());
+        JTextArea area = new JTextArea(text.toString(), 15, 56);
+        area.setEditable(false);
+        area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        JOptionPane.showMessageDialog(this, new JScrollPane(area), "High Scores", JOptionPane.INFORMATION_MESSAGE);
     }
 
     /** Scales the logo dynamically to fit window while keeping buttons visible */

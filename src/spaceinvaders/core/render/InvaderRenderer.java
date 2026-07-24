@@ -16,6 +16,8 @@ public final class InvaderRenderer {
         Image img;
         switch (inv.kind) {
             case TANK:     img = state.invaderImageTank;     break;
+            case HAILFIRE: img = state.invaderImageTank;     break; // existing tank art is the deliberate placeholder
+            case B2:       img = state.invaderImageB2;       break;
             case SWARMER:  img = state.invaderImageSwarmer;  break;
             case SHIELDED: img = state.invaderImageShielded; break;
             case SHOOTER:  img = state.invaderImageShooter;  break;
@@ -48,6 +50,8 @@ public final class InvaderRenderer {
     private static Color colorFor(Invader.InvaderKind k) {
         switch (k) {
             case TANK:     return new Color(200, 160, 60); // gold-ish
+            case HAILFIRE: return new Color(110, 70, 145);
+            case B2:       return new Color(165, 165, 175);
             case SWARMER:  return new Color(140, 255, 140);
             case SHIELDED: return new Color(100, 200, 255);
             case SHOOTER:  return new Color(255, 120, 120);

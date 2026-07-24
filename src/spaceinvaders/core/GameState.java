@@ -37,6 +37,7 @@ public class GameState {
     // NEW: per-kind images (used by core.render.InvaderRenderer)
     // ------------------------------------------------------------------
     public Image invaderImageBasic;     // b1_droid.png
+    public Image invaderImageB2;        // b2_droid.png
     public Image invaderImageTank;      // aat.png
     public Image invaderImageShielded;  // droideka.png
     public Image invaderImageShooter;   // bx_commando_droid.png
@@ -54,4 +55,7 @@ public class GameState {
     // Input flags
     public boolean moveLeft = false;
     public boolean moveRight = false;
+
+    /** Bridge used by scenes to return to the Swing title overlay without owning it. */
+    public Runnable showStartMenu;
 }

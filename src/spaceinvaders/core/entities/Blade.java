@@ -36,7 +36,10 @@ public class Blade extends Bullet {
     private final boolean verticalBounceEnabled;
 
     private int lifeMs = 0;
-    private final int maxLifeMs = 9000; // safety
+    private int maxLifeMs = 9000; // safety
+
+    /** Campaign upgrade hook; never permits an unbounded blade lifetime. */
+    public void setMaxLifeMs(int maxLifeMs) { this.maxLifeMs = Math.max(1000, Math.min(15000, maxLifeMs)); }
 
     public Blade(
             int x, int y,
@@ -87,21 +90,19 @@ public class Blade extends Bullet {
 
         List<Bullet> spawned = new ArrayList<>();
 
-        int half = Math.max(1, this.size / 2);
-
-        boolean hitLeft  = (this.x - half) <= 0;
-        boolean hitRight = (this.x + half) >= worldW;
+        boolean hitLeft  = this.x <= 0;
+        boolean hitRight = this.x + this.size >= worldW;
 
         if (hitLeft || hitRight) {
-            // clamp
-            if (hitLeft)  this.x = half;
-            if (hitRight) this.x = worldW - half;
+            // Clamp outside the wall before reflecting; one bounce per axis/tick.
+            if (hitLeft) this.x = 0;
+            else this.x = Math.max(0, worldW - this.size);
 
             // reflect X
             this.vx = -this.vx;
 
             // OPTIONAL: widen rebound slightly (makes it feel less “straight up”)
-            this.vx += (this.vx > 0 ? 1 : -1);
+            this.vx = Math.max(-20, Math.min(20, this.vx));
 
             bouncesRemaining--;
 
@@ -155,15 +156,15 @@ public class Blade extends Bullet {
             }
         }
 
-        boolean hitTop    = (this.y - half) <= 0;
-        boolean hitBottom = (this.y + half) >= worldH;
+        boolean hitTop    = this.y <= 0;
+        boolean hitBottom = this.y + this.size >= worldH;
 
         if (hitTop || hitBottom) {
             if (!verticalBounceEnabled) {
                 pierceRemaining = 0; // mark dead
             } else {
-                if (hitTop) this.y = half;
-                if (hitBottom) this.y = worldH - half;
+                if (hitTop) this.y = 0;
+                else this.y = Math.max(0, worldH - this.size);
                 this.vy = -this.vy;
 
                 // optional flash on vertical bounce too

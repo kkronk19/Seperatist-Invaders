@@ -21,6 +21,16 @@ public final class KeyInput {
         bind(im, am, "SPACE", KeyEvent.VK_SPACE,scenes);
         bind(im, am, "R",     KeyEvent.VK_R,    scenes);
         bind(im, am, "F", KeyEvent.VK_F, scenes);
+        bind(im, am, "P", KeyEvent.VK_P, scenes);
+        bind(im, am, "U", KeyEvent.VK_U, scenes);
+        bind(im, am, "M", KeyEvent.VK_M, scenes);
+        bind(im, am, "ESCAPE", KeyEvent.VK_ESCAPE, scenes);
+        bind(im, am, "ENTER", KeyEvent.VK_ENTER, scenes);
+        bind(im, am, "1", KeyEvent.VK_1, scenes);
+        bind(im, am, "2", KeyEvent.VK_2, scenes);
+        bind(im, am, "3", KeyEvent.VK_3, scenes);
+        bind(im, am, "4", KeyEvent.VK_4, scenes);
+        bind(im, am, "NUMPAD4", KeyEvent.VK_NUMPAD4, scenes);
     }
 
     private static void bind(InputMap im, ActionMap am, String key, int vk, SceneManager scenes) {

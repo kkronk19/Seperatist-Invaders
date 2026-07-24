@@ -23,7 +23,7 @@ public final class Bootstrap {
 
             SceneManager scenes = new SceneManager();
 
-            JFrame frame = new JFrame("Space Invaders");
+            JFrame frame = new JFrame("Separatist Invaders");
             frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
             GamePanel panel = new GamePanel(state, scenes);
@@ -38,6 +38,13 @@ public final class Bootstrap {
             startMenu.setVisible(true);
 
             frame.setContentPane(panel);
+
+            state.showStartMenu = () -> SwingUtilities.invokeLater(() -> {
+                scenes.clear();
+                state.mode = GameState.AppMode.START_MENU;
+                startMenu.setVisible(true);
+                panel.requestFocusInWindow();
+            });
 
             // Pick a window size that fits the current display
             Rectangle bounds = GraphicsEnvironment
